@@ -136,6 +136,8 @@ public class MicrocksContainerTest {
          testRequest.setTestEndpoint("http://host.docker.internal:" + goodImpl.getMappedPort(3002));
          TestResult testResult = microcks.testEndpoint(testRequest);
 
+         System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(testResult));
+         System.err.println(microcks.getLogs());
          assertTrue(testResult.isSuccess());
          System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(testResult));
       } catch (Exception e) {
