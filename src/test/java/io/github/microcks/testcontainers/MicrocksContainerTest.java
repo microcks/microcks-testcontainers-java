@@ -27,6 +27,7 @@ import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import org.junit.Test;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 import org.testcontainers.utility.DockerImageName;
@@ -63,12 +64,16 @@ public class MicrocksContainerTest {
    @Test
    public void testContractTestingFunctionality() throws Exception {
       try (
-            MicrocksContainer microcks = new MicrocksContainer(MICROCKS_IMAGE);
+            Network network = Network.newNetwork();
+            MicrocksContainer microcks = new MicrocksContainer(MICROCKS_IMAGE)
+                  .withNetwork(network);
             GenericContainer<?> badImpl = new GenericContainer<>(BAD_PASTRY_IMAGE)
-                  .withExposedPorts(3001)
+                  .withNetwork(network)
+                  .withNetworkAliases("bad-impl")
                   .waitingFor(Wait.forLogMessage(".*Example app listening on port 3001.*", 1));
             GenericContainer<?> goodImpl = new GenericContainer<>(GOOD_PASTRY_IMAGE)
-                  .withExposedPorts(3002)
+                  .withNetwork(network)
+                  .withNetworkAliases("good-impl")
                   .waitingFor(Wait.forLogMessage(".*Example app listening on port 3002.*", 1));
 
       ) {
@@ -107,7 +112,7 @@ public class MicrocksContainerTest {
       TestRequestDTO testRequest = new TestRequestDTO();
       testRequest.setServiceId("API Pastries:0.0.1");
       testRequest.setRunnerType(TestRunnerType.OPEN_API_SCHEMA.name());
-      testRequest.setTestEndpoint("http://host.docker.internal:" + badImpl.getMappedPort(3001));
+      testRequest.setTestEndpoint("http://bad-impl:3001");
       testRequest.setTimeout(2000l);
 
       /*
@@ -133,7 +138,7 @@ public class MicrocksContainerTest {
 
       try {
          // Switch endpoint to the correct implementation.
-         testRequest.setTestEndpoint("http://host.docker.internal:" + goodImpl.getMappedPort(3002));
+         testRequest.setTestEndpoint("http://good-impl:3002");
          TestResult testResult = microcks.testEndpoint(testRequest);
 
          System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(testResult));
