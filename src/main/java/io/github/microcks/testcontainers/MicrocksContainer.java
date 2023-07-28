@@ -162,7 +162,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
 
       if (response.statusCode() == 201) {
          TestResult testResult = getMapper().readValue(response.body(), TestResult.class);
-         log.debug("Got Test Result: " + testResult.getId());
+         log.debug("Got Test Result: {}", testResult.getId());
 
          while (System.currentTimeMillis() < (startTime + wait)) {
             testResult = refreshTestResult(testResult.getId());
@@ -180,8 +180,10 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
 
          return testResult;
       }
-      log.error("Couldn't launch on new test on Microcks with status: " + response.statusCode());
-      log.error("Error response body is: " + response.body());
+      if (log.isErrorEnabled()) {
+         log.error("Couldn't launch on new test on Microcks with status {} ", response.statusCode());
+         log.error("Error response body is {}", response.body());
+      }
       throw new MicrocksException("Couldn't launch on new test on Microcks. Please check Microcks container logs");
    }
 
