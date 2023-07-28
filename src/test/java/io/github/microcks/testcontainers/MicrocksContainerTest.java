@@ -107,7 +107,7 @@ public class MicrocksContainerTest {
       millefeuille.getBody().prettyPrint();
    }
 
-   private void testMicrocksContractTestingFunctionality(MicrocksContainer microcks, GenericContainer badImpl, GenericContainer goodImpl) {
+   private void testMicrocksContractTestingFunctionality(MicrocksContainer microcks, GenericContainer badImpl, GenericContainer goodImpl) throws Exception {
       // Produce a new test request.
       TestRequestDTO testRequest = new TestRequestDTO();
       testRequest.setServiceId("API Pastries:0.0.1");
@@ -125,28 +125,24 @@ public class MicrocksContainerTest {
             .build();
        */
 
+
+      // First test should fail with validation failure messages.
+      TestResult testResult = microcks.testEndpoint(testRequest);
+      assertFalse(testResult.isSuccess());
+      assertEquals("http://bad-impl:3001", testResult.getTestedEndpoint());
+      assertEquals(3, testResult.getTestCaseResults().size());
+      assertTrue(testResult.getTestCaseResults().get(0).getTestStepResults().get(0).getMessage().contains("object has missing required properties"));
+
+      /*
       ObjectMapper mapper = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
+      System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(testResult));
+      */
 
-      try {
-         TestResult testResult = microcks.testEndpoint(testRequest);
-
-         assertFalse(testResult.isSuccess());
-         System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(testResult));
-      } catch (Exception e) {
-         e.printStackTrace();
-      }
-
-      try {
-         // Switch endpoint to the correct implementation.
-         testRequest.setTestEndpoint("http://good-impl:3002");
-         TestResult testResult = microcks.testEndpoint(testRequest);
-
-         System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(testResult));
-         System.err.println(microcks.getLogs());
-         assertTrue(testResult.isSuccess());
-         System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(testResult));
-      } catch (Exception e) {
-         e.printStackTrace();
-      }
+      // Switch endpoint to the correct implementation.
+      testRequest.setTestEndpoint("http://good-impl:3002");
+      testResult = microcks.testEndpoint(testRequest);
+      assertEquals("http://good-impl:3002", testResult.getTestedEndpoint());
+      assertEquals(3, testResult.getTestCaseResults().size());
+      assertEquals("", testResult.getTestCaseResults().get(0).getTestStepResults().get(0).getMessage());
    }
 }

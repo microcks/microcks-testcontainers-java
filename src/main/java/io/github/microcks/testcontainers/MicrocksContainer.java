@@ -45,6 +45,7 @@ import java.nio.channels.Pipe;
 import java.nio.charset.StandardCharsets;
 
 /**
+ * Testcontainers implementation for main Microcks container.
  * @author laurent
  */
 public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
@@ -60,7 +61,11 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
 
    private ObjectMapper mapper;
 
-
+   /**
+    * Build a new MicrocksContainer with its full container image name. This image must
+    * be compatible with quay.io/microcks/microcks-uber image.
+    * @param imageName The name (with tag/version) of Microcks Uber distribution to use.
+    */
    public MicrocksContainer(DockerImageName imageName) {
       super(imageName);
       imageName.assertCompatibleWith(MICROCKS_IMAGE);
@@ -80,11 +85,11 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    }
 
    /**
-    *
-    * @param type
-    * @param service
-    * @param version
-    * @return
+    * Get the exposed mock endpoint for a specified Service/API.
+    * @param type The type of service (eg. API style or protocol)
+    * @param service The name of Service/API
+    * @param version The version of Service/API
+    * @return A usable endpoint to interact with Microcks mocks.
     */
    public String getMockEndpoint(ServiceType type, String service, String version) {
       switch (type) {
@@ -97,8 +102,14 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          case GRAPHQL -> {
             return String.format("%s/graphql/%s/%s", getHttpEndpoint(),  service, version);
          }
+         case GENERIC_REST -> {
+            return String.format("%s/dynarest/%s/%s", getHttpEndpoint(), service, version);
+         }
          case GRPC -> {
             return getGrpcEndpoint();
+         }
+         case EVENT, GENERIC_EVENT -> {
+            return "Unsupported at the moment";
          }
       }
       return getHttpEndpoint();
@@ -125,13 +136,14 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    }
 
    /**
-    *
-    * @param testRequest
-    * @return
-    * @throws IOException
-    * @throws InterruptedException
+    * Launch a conformance test on an endpoint.
+    * @param testRequest The test specifications (API under test, endpoint, runner, ...)
+    * @return The final TestResult containing information on success/failure as well as details on test cases.
+    * @throws IOException If connection to Microcks container failed (no route to host, low-level network stuffs)
+    * @throws InterruptedException If connection to Microcks container is interrupted
+    * @throws MicrocksException If Microcks fails creating a new test giving your request.
     */
-   public TestResult testEndpoint(TestRequestDTO testRequest) throws IOException, InterruptedException {
+   public TestResult testEndpoint(TestRequestDTO testRequest) throws IOException, InterruptedException, MicrocksException {
       long startTime = System.currentTimeMillis();
       long wait = testRequest.getTimeout();
 
@@ -145,29 +157,32 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
             .build();
 
       // Send the request and parse status code.
+      log.debug("Sending a test request to Microcks container: {}", requestBody);
       HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
       if (response.statusCode() == 201) {
          TestResult testResult = getMapper().readValue(response.body(), TestResult.class);
-         System.err.println("Got Test Result: " + testResult.getId());
+         log.debug("Got Test Result: " + testResult.getId());
 
-         boolean success = false;
          while (System.currentTimeMillis() < (startTime + wait)) {
             testResult = refreshTestResult(testResult.getId());
             if (!testResult.isInProgress()) {
                break;
             }
-            // Else sleep for 1 second before refreshing the status.
+
             try {
+               // Else sleep for 500 ms before refreshing the status.
                Thread.sleep(500);
             } catch (InterruptedException ie) {
-               ie.printStackTrace();
+               // It's fine to be interrupted here we'll loop again.
             }
          }
 
          return testResult;
       }
-      return null;
+      log.error("Couldn't launch on new test on Microcks with status: " + response.statusCode());
+      log.error("Error response body is: " + response.body());
+      throw new MicrocksException("Couldn't launch on new test on Microcks. Please check Microcks container logs");
    }
 
    private void importArtifact(File artifact, boolean mainArtifact) throws IOException, InterruptedException {
@@ -230,10 +245,6 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       // Send the request and parse status code.
       HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-      if (response.statusCode() == 200) {
-         return getMapper().readValue(response.body(), TestResult.class);
-      }
-      log.error("");
-      return null;
+      return getMapper().readValue(response.body(), TestResult.class);
    }
 }

@@ -23,6 +23,8 @@ import java.util.Map;
 
 /**
  * Data Transfer object for grouping base information to launch a test (and thus create a TestResult).
+ * Such requests have 3 mandatory parameters: `serviceId`, `testEndpoint` and `runnerType` (string representation
+ * of a {@link io.github.microcks.domain.TestRunnerType}).
  * @author laurent
  */
 public class TestRequestDTO {
@@ -92,6 +94,9 @@ public class TestRequestDTO {
    }
 
 
+   /**
+    * Builder/Fluent API for creating TestRequestDTO instances.
+    */
    public static class Builder {
       private String serviceId;
       private String testEndpoint;
@@ -136,6 +141,10 @@ public class TestRequestDTO {
          return this;
       }
 
+      /**
+       * Build a new TestRequestDTO instance after having initialized the different properties.
+       * @return A new TestRequestDTO instance
+       */
       public TestRequestDTO build() {
          // Build a request considering mandatory props are there.
          TestRequestDTO request = new TestRequestDTO();
