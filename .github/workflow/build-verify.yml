@@ -1,0 +1,35 @@
+name: build-verify-package
+on:
+  push:
+    paths-ignore:
+      - '.gitignore'
+      - 'LICENSE'
+      - 'README*'
+  pull_request:
+    paths-ignore:
+      - '.github/**'
+      - '.gitignore'
+      - 'LICENSE'
+      - 'README*'
+
+jobs:
+  build-verify-package:
+    runs-on: ubuntu-latest
+    environment: Build
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up JDK 17 for x64
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          architecture: x64
+          cache: maven
+
+      - name: Build Java components
+        run: mvn -B clean package
+
+      - name: Verify Javadoc completion
+        run: mvn -B javadoc:javadoc
