@@ -59,7 +59,7 @@ Artifacts can be imported as main/Primary ones or as secondary ones. See [Multi-
 
 ```java
 microcks.importAsMainArtifact(new File("target/test-classes/apipastries-openapi.yaml"));
-microcks.importAsSecondaryArtifact(new File("target/test-classes/apipastries-postman-collection.yaml"));
+microcks.importAsSecondaryArtifact(new File("target/test-classes/apipastries-postman-collection.json"));
 ```
 
 Please refer to our [MicrocksContainerTest](https://github.com/microcks/microcks-testcontainers-java/blob/main/src/test/java/io/github/microcks/testcontainers/MicrocksContainerTest.java) for comprehensive example on how to use it.
