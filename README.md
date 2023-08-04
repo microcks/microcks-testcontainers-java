@@ -1,4 +1,4 @@
-# Microcks Testcontainers Jva
+# Microcks Testcontainers Java
 
 Java library for Testcontainers that enables embedding Microcks into your JUnit tests with lightweight, throwaway instance thanks to containers
 
@@ -70,10 +70,12 @@ During your test setup, you'd probably need to retrieve mock endpoints provided 
 setup your base API url calls. You can do it like this:
 
 ```java
-String baseApiUrl = microcks.getMockEndpoint(ServiceType.REST, "API Pastries", "0.0.1");
+String baseApiUrl = microcks.getRestMockEndpoint("API Pastries", "0.0.1");
 ```
 
-The container also provides `getHttpEndpoint()` and `getGrpcEndpoint()` methods for raw access to those API endpoints.
+The container provides methods for different supported API styles/protocols (Soap, GraphQL, gRPC,...).
+
+The container also provides `getHttpEndpoint()` for raw access to those API endpoints.
 
 ### Launching new contract-tests
 
@@ -84,7 +86,7 @@ you can launch a Microcks contract/conformance test using the local server port 
 @LocalServerPort
 private int port;
 
-TestRequestDTO testRequest = new TestRequestDTO.Builder()
+TestRequest testRequest = new TestRequest.Builder()
    .serviceId("API Pastries:0.0.1")
    .runnerType(TestRunnerType.OPEN_API_SCHEMA.name())
    .testEndpoint("http://localhost:" + port)

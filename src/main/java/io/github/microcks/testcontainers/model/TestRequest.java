@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package io.github.microcks.testcontainers;
+package io.github.microcks.testcontainers.model;
 
 import java.util.List;
 import java.util.Map;
@@ -24,10 +24,10 @@ import java.util.Map;
 /**
  * Data Transfer object for grouping base information to launch a test (and thus create a TestResult).
  * Such requests have 3 mandatory parameters: `serviceId`, `testEndpoint` and `runnerType` (string representation
- * of a {@link io.github.microcks.domain.TestRunnerType}).
+ * of a {@link io.github.microcks.testcontainers.model.TestRunnerType}).
  * @author laurent
  */
-public class TestRequestDTO {
+public class TestRequest {
 
    private String serviceId;
    private String testEndpoint;
@@ -35,7 +35,7 @@ public class TestRequestDTO {
    private String secretName;
    private Long timeout = 5000L;
    private List<String> filteredOperations;
-   private Map<String, List<HeaderDTO>> operationsHeaders;
+   private Map<String, List<Header>> operationsHeaders;
 
    public String getServiceId() {
       return serviceId;
@@ -85,11 +85,11 @@ public class TestRequestDTO {
       this.filteredOperations = filteredOperations;
    }
 
-   public Map<String, List<HeaderDTO>> getOperationsHeaders() {
+   public Map<String, List<Header>> getOperationsHeaders() {
       return operationsHeaders;
    }
 
-   public void setOperationsHeaders(Map<String, List<HeaderDTO>> operationsHeaders) {
+   public void setOperationsHeaders(Map<String, List<Header>> operationsHeaders) {
       this.operationsHeaders = operationsHeaders;
    }
 
@@ -104,7 +104,7 @@ public class TestRequestDTO {
       private String secretName;
       private Long timeout;
       private List<String> filteredOperations;
-      private Map<String, List<HeaderDTO>> operationsHeaders;
+      private Map<String, List<Header>> operationsHeaders;
 
       public Builder serviceId(String serviceId) {
          this.serviceId = serviceId;
@@ -136,7 +136,7 @@ public class TestRequestDTO {
          return this;
       }
 
-      public Builder operationsHeaders(Map<String, List<HeaderDTO>> operationsHeaders) {
+      public Builder operationsHeaders(Map<String, List<Header>> operationsHeaders) {
          this.operationsHeaders = operationsHeaders;
          return this;
       }
@@ -145,9 +145,9 @@ public class TestRequestDTO {
        * Build a new TestRequestDTO instance after having initialized the different properties.
        * @return A new TestRequestDTO instance
        */
-      public TestRequestDTO build() {
+      public TestRequest build() {
          // Build a request considering mandatory props are there.
-         TestRequestDTO request = new TestRequestDTO();
+         TestRequest request = new TestRequest();
          request.setServiceId(serviceId);
          request.setRunnerType(runnerType);
          request.setTestEndpoint(testEndpoint);

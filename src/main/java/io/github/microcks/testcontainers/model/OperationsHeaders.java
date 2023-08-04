@@ -16,30 +16,21 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-package io.github.microcks.testcontainers;
+package io.github.microcks.testcontainers.model;
+
+import java.util.HashMap;
+import java.util.Set;
 
 /**
- * Data Transfer object for basic header with its values (comma separated string).
+ * Specification of additional headers for a Service/API operations. Keys are operation name or "globals"
+ * (if header applies to all), values are Header objects.
  * @author laurent
  */
-public class HeaderDTO {
+public class OperationsHeaders extends HashMap<String, Set<Header>>  {
 
-   private String name;
-   private String values;
+   public static final String GLOBALS = "globals";
 
-   public String getName() {
-      return name;
-   }
-
-   public void setName(String name) {
-      this.name = name;
-   }
-
-   public String getValues() {
-      return values;
-   }
-
-   public void setValues(String values) {
-      this.values = values;
+   public Set<Header> getGlobals() {
+      return this.get(GLOBALS);
    }
 }

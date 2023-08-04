@@ -5,7 +5,7 @@
   <groupId>io.github.microcks</groupId>
   <artifactId>microcks-testcontainers</artifactId>
   <packaging>jar</packaging>
-  <version>0.0.1-SNAPSHOT</version>
+  <version>0.1.0-SNAPSHOT</version>
 
   <name>Microcks Testcontainers</name>
   <description>Microcks Testcontainers Java library</description>
@@ -42,8 +42,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <sonar.organization>microcks</sonar.organization>
     <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-    <java.version>17</java.version>
-    <microcks.version>1.7.1</microcks.version>
+    <java.version>11</java.version>
     <testcontainers.version>1.18.3</testcontainers.version>
     <httpmime.version>4.5.14</httpmime.version>
     <jupiter.version>5.8.1</jupiter.version>
@@ -60,17 +59,6 @@
       <groupId>org.apache.httpcomponents</groupId>
       <artifactId>httpmime</artifactId>
       <version>${httpmime.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>io.github.microcks</groupId>
-      <artifactId>microcks-model</artifactId>
-      <version>${microcks.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.springframework.boot</groupId>
-          <artifactId>spring-boot-starter-data-mongodb</artifactId>
-        </exclusion>
-      </exclusions>
     </dependency>
 
     <dependency>

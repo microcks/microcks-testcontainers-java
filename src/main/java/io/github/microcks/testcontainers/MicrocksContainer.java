@@ -18,8 +18,8 @@
  */
 package io.github.microcks.testcontainers;
 
-import io.github.microcks.domain.ServiceType;
-import io.github.microcks.domain.TestResult;
+import io.github.microcks.testcontainers.model.TestResult;
+import io.github.microcks.testcontainers.model.TestRequest;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import org.apache.http.HttpEntity;
@@ -28,9 +28,10 @@ import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
+import org.testcontainers.shaded.org.awaitility.Awaitility;
+import org.testcontainers.shaded.org.awaitility.core.ConditionTimeoutException;
 import org.testcontainers.utility.DockerImageName;
 
 import java.io.File;
@@ -43,6 +44,7 @@ import java.net.http.HttpResponse;
 import java.nio.channels.Channels;
 import java.nio.channels.Pipe;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Testcontainers implementation for main Microcks container.
@@ -62,6 +64,15 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    private ObjectMapper mapper;
 
    /**
+    * Build a new MicrocksContainer with its container image name as string. This image must
+    * be compatible with quay.io/microcks/microcks-uber image.
+    * @param image The name (with tag/version) of Microcks Uber distribution to use.
+    */
+   public MicrocksContainer(String image) {
+      this(DockerImageName.parse(image));
+   }
+
+   /**
     * Build a new MicrocksContainer with its full container image name. This image must
     * be compatible with quay.io/microcks/microcks-uber image.
     * @param imageName The name (with tag/version) of Microcks Uber distribution to use.
@@ -71,48 +82,54 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       imageName.assertCompatibleWith(MICROCKS_IMAGE);
 
       withExposedPorts(MICROCKS_HTTP_PORT, MICROCKS_GRPC_PORT);
-      withLogConsumer(new Slf4jLogConsumer(log));
 
       waitingFor(Wait.forLogMessage(".*Started MicrocksApplication.*", 1));
    }
 
+   /**
+    * Get the Http endpoint where Microcks can be accessed (you'd have to append '/api' to access APIs)
+    * @return The Http endpoint for talking to container.
+    */
    public String getHttpEndpoint() {
       return String.format("http://%s:%s", getHost(), getMappedPort(MICROCKS_HTTP_PORT));
    }
 
-   public String getGrpcEndpoint() {
-      return String.format("grpc://%s:%s", getHost(), getMappedPort(MICROCKS_GRPC_PORT));
-   }
-
    /**
-    * Get the exposed mock endpoint for a specified Service/API.
-    * @param type The type of service (eg. API style or protocol)
+    * Get the exposed mock endpoint for a SOAP Service.
     * @param service The name of Service/API
     * @param version The version of Service/API
     * @return A usable endpoint to interact with Microcks mocks.
     */
-   public String getMockEndpoint(ServiceType type, String service, String version) {
-      switch (type) {
-         case SOAP_HTTP -> {
-            return String.format("%s/soap/%s/%s", getHttpEndpoint(),  service, version);
-         }
-         case REST -> {
-            return String.format("%s/rest/%s/%s", getHttpEndpoint(),  service, version);
-         }
-         case GRAPHQL -> {
-            return String.format("%s/graphql/%s/%s", getHttpEndpoint(),  service, version);
-         }
-         case GENERIC_REST -> {
-            return String.format("%s/dynarest/%s/%s", getHttpEndpoint(), service, version);
-         }
-         case GRPC -> {
-            return getGrpcEndpoint();
-         }
-         case EVENT, GENERIC_EVENT -> {
-            return "Unsupported at the moment";
-         }
-      }
-      return getHttpEndpoint();
+   public String getSoapMockEndpoint(String service, String version) {
+      return String.format("%s/soap/%s/%s", getHttpEndpoint(),  service, version);
+   }
+
+   /**
+    * Get the exposed mock endpoint for a REST API.
+    * @param service The name of Service/API
+    * @param version The version of Service/API
+    * @return A usable endpoint to interact with Microcks mocks.
+    */
+   public String getRestMockEndpoint(String service, String version) {
+      return String.format("%s/rest/%s/%s", getHttpEndpoint(),  service, version);
+   }
+
+   /**
+    * Get the exposed mock endpoint for a GRPC Service.
+    * @param service The name of Service/API
+    * @param version The version of Service/API
+    * @return A usable endpoint to interact with Microcks mocks.
+    */
+   public String getGraphQLMockEndpoint(String service, String version) {
+      return String.format("%s/graphql/%s/%s", getHttpEndpoint(), service, version);
+   }
+
+   /**
+    * Get the exposed mock endpoint for a GRPC Service.
+    * @return A usable endpoint to interact with Microcks mocks.
+    */
+   public String getGrpcMockEndpoint() {
+      return String.format("grpc://%s:%s", getHost(), getMappedPort(MICROCKS_GRPC_PORT));
    }
 
    /**
@@ -120,8 +137,9 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     * @param artifact The file representing artifact (OpenAPI, Postman collection, Protobuf, GraphQL schema, ...)
     * @throws IOException If file cannot be read of transmission exception occurs.
     * @throws InterruptedException If connection to the docker container is interrupted.
+    * @throws MicrocksException If artifact cannot be correctly imported in container (probably malformed)
     */
-   public void importAsMainArtifact(File artifact) throws IOException, InterruptedException {
+   public void importAsMainArtifact(File artifact) throws IOException, InterruptedException, MicrocksException {
       importArtifact(artifact, true);
    }
 
@@ -130,8 +148,9 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     * @param artifact The file representing artifact (OpenAPI, Postman collection, Protobuf, GraphQL schema, ...)
     * @throws IOException If file cannot be read of transmission exception occurs.
     * @throws InterruptedException If connection to the docker container is interrupted.
+    * @throws MicrocksException If artifact cannot be correctly imported in container (probably malformed)
     */
-   public void importAsSecondaryArtifact(File artifact) throws IOException, InterruptedException {
+   public void importAsSecondaryArtifact(File artifact) throws IOException, InterruptedException, MicrocksException {
       importArtifact(artifact, false);
    }
 
@@ -143,10 +162,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     * @throws InterruptedException If connection to Microcks container is interrupted
     * @throws MicrocksException If Microcks fails creating a new test giving your request.
     */
-   public TestResult testEndpoint(TestRequestDTO testRequest) throws IOException, InterruptedException, MicrocksException {
-      long startTime = System.currentTimeMillis();
-      long wait = testRequest.getTimeout();
-
+   public TestResult testEndpoint(TestRequest testRequest) throws IOException, InterruptedException, MicrocksException {
       String requestBody = getMapper().writeValueAsString(testRequest);
 
       HttpClient client = HttpClient.newHttpClient();
@@ -162,23 +178,21 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
 
       if (response.statusCode() == 201) {
          TestResult testResult = getMapper().readValue(response.body(), TestResult.class);
-         log.debug("Got Test Result: {}", testResult.getId());
+         log.debug("Got Test Result: {}, now polling for progression", testResult.getId());
 
-         while (System.currentTimeMillis() < (startTime + wait)) {
-            testResult = refreshTestResult(testResult.getId());
-            if (!testResult.isInProgress()) {
-               break;
-            }
-
-            try {
-               // Else sleep for 500 ms before refreshing the status.
-               Thread.sleep(500);
-            } catch (InterruptedException ie) {
-               // It's fine to be interrupted here we'll loop again.
-            }
+         final String testResultId = testResult.getId();
+         try {
+            Awaitility.await()
+                  .atMost(testRequest.getTimeout(), TimeUnit.MILLISECONDS)
+                  .pollDelay(100, TimeUnit.MILLISECONDS)
+                  .pollInterval(200, TimeUnit.MILLISECONDS)
+                  .until(() -> !refreshTestResult(testResultId).isInProgress());
+         } catch (ConditionTimeoutException timeoutException) {
+            log.info("Caught a ConditionTimeoutException for test on {}", testRequest.getTestEndpoint());
          }
 
-         return testResult;
+         // Return the final result.
+         return refreshTestResult(testResultId);
       }
       if (log.isErrorEnabled()) {
          log.error("Couldn't launch on new test on Microcks with status {} ", response.statusCode());
@@ -187,7 +201,11 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       throw new MicrocksException("Couldn't launch on new test on Microcks. Please check Microcks container logs");
    }
 
-   private void importArtifact(File artifact, boolean mainArtifact) throws IOException, InterruptedException {
+   private void importArtifact(File artifact, boolean mainArtifact) throws IOException, InterruptedException, MicrocksException {
+      if (!artifact.exists()) {
+         throw new IOException("Artifact " + artifact.getPath() + " does not exist or can't be read.");
+      }
+
       HttpEntity httpEntity = MultipartEntityBuilder.create()
             .addBinaryBody("file", artifact, ContentType.APPLICATION_OCTET_STREAM, artifact.getName())
             .build();
@@ -221,7 +239,8 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
       if (response.statusCode() != 201) {
-         log.error("");
+         log.error("Artifact has not been correctly been imported: {}", response.body());
+         throw new MicrocksException("Artifact has not been correctly been imported: " + response.body());
       }
    }
 
