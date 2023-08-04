@@ -3,13 +3,15 @@
 Java library for Testcontainers that enables embedding Microcks into your JUnit tests with lightweight, throwaway instance thanks to containers
 
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/microcks/microcks-testcontainers-java/build-verify.yml?logo=github&style=for-the-badge)](https://github.com/microcks/microcks-testcontainers-java/actions)
-[![Version](https://img.shields.io/maven-central/v/io.github.microcks/microcks-testcontainers-java?color=blue&style=for-the-badge)]((https://search.maven.org/artifact/io.github.microcks/microcks-testcontainers-java))
+[![Version](https://img.shields.io/maven-central/v/io.github.microcks/microcks-testcontainers?color=blue&style=for-the-badge)]((https://search.maven.org/artifact/io.github.microcks/microcks-testcontainers-java))
 [![License](https://img.shields.io/github/license/microcks/microcks-testcontainers-java?style=for-the-badge&logo=apache)](https://www.apache.org/licenses/LICENSE-2.0)
 [![Project Chat](https://img.shields.io/badge/chat-on_zulip-pink.svg?color=ff69b4&style=for-the-badge&logo=zulip)](https://microcksio.zulipchat.com/)
 
 ## Build Status
 
-Current development version is `0.1.0-SNAPSHOT`.
+Latest released version is `0.1.0`.
+
+Current development version is `0.1.1-SNAPSHOT`.
 
 #### Sonarcloud Quality metrics
 
