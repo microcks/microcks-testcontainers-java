@@ -24,11 +24,8 @@ package io.github.microcks.testcontainers.model;
  */
 public class SecretRef {
 
-   public String secretId;
-   public String name;
-
-   public SecretRef() {
-   }
+   private String secretId;
+   private String name;
 
    public String getSecretId() {
       return secretId;
