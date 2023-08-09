@@ -58,6 +58,7 @@ public class MicrocksContainerTest {
 
          microcks.importAsMainArtifact(new File("target/test-classes/apipastries-openapi.yaml"));
          microcks.importAsSecondaryArtifact(new File("target/test-classes/apipastries-postman-collection.json"));
+         testMockEndpoints(microcks);
          testMicrocksMockingFunctionality(microcks);
       }
    }
@@ -94,6 +95,20 @@ public class MicrocksContainerTest {
             .thenReturn();
 
       assertEquals(200, keycloakConfig.getStatusCode());
+   }
+
+   private void testMockEndpoints(MicrocksContainer microcks) {
+      String baseWsUrl = microcks.getSoapMockEndpoint("Pastries Service", "1.0");
+      assertEquals(microcks.getHttpEndpoint() + "/soap/Pastries Service/1.0", baseWsUrl);
+
+      String baseApiUrl = microcks.getRestMockEndpoint("API Pastries", "0.0.1");
+      assertEquals(microcks.getHttpEndpoint() + "/rest/API Pastries/0.0.1", baseApiUrl);
+
+      String baseGraphUrl = microcks.getGraphQLMockEndpoint("Pastries Graph", "1");
+      assertEquals(microcks.getHttpEndpoint() + "/graphql/Pastries Graph/1", baseGraphUrl);
+
+      String baseGrpcUrl = microcks.getGrpcMockEndpoint();
+      assertEquals("grpc://" + microcks.getHost() + ":" + microcks.getMappedPort(MicrocksContainer.MICROCKS_GRPC_PORT), baseGrpcUrl);
    }
 
    private void testMicrocksMockingFunctionality(MicrocksContainer microcks) {
