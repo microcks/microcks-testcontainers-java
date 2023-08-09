@@ -61,7 +61,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    public static final int MICROCKS_HTTP_PORT = 8080;
    public static final int MICROCKS_GRPC_PORT = 9090;
 
-   private ObjectMapper mapper;
+   private static ObjectMapper mapper;
 
    /**
     * Build a new MicrocksContainer with its container image name as string. This image must
@@ -183,11 +183,25 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     * @throws MicrocksException If Microcks fails creating a new test giving your request.
     */
    public TestResult testEndpoint(TestRequest testRequest) throws IOException, InterruptedException, MicrocksException {
+      return testEndpoint(getHttpEndpoint(), testRequest);
+   }
+
+   /**
+    * Launch a conformance test on an endpoint. This may be a fallback to non-static {@code testEndpoint(TestRequest testRequest)}
+    * method if you don't have direct access to the MicrocksContainer instance you want to run this test on.
+    * @param microcksContainerHttpEndpoint The Http endpoint where to reach running MicrocksContainer
+    * @param testRequest The test specifications (API under test, endpoint, runner, ...)
+    * @return The final TestResult containing information on success/failure as well as details on test cases.
+    * @throws IOException If connection to Microcks container failed (no route to host, low-level network stuffs)
+    * @throws InterruptedException If connection to Microcks container is interrupted
+    * @throws MicrocksException If Microcks fails creating a new test giving your request.
+    */
+   public static TestResult testEndpoint(String microcksContainerHttpEndpoint, TestRequest testRequest) throws IOException, InterruptedException, MicrocksException {
       String requestBody = getMapper().writeValueAsString(testRequest);
 
       HttpClient client = HttpClient.newHttpClient();
       HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(getHttpEndpoint() + "/api/tests"))
+            .uri(URI.create(microcksContainerHttpEndpoint + "/api/tests"))
             .header("Content-Type", ContentType.APPLICATION_JSON.getMimeType())
             .POST(HttpRequest.BodyPublishers.ofString(requestBody, StandardCharsets.UTF_8))
             .build();
@@ -206,13 +220,13 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
                   .atMost(testRequest.getTimeout(), TimeUnit.MILLISECONDS)
                   .pollDelay(100, TimeUnit.MILLISECONDS)
                   .pollInterval(200, TimeUnit.MILLISECONDS)
-                  .until(() -> !refreshTestResult(testResultId).isInProgress());
+                  .until(() -> !refreshTestResult(microcksContainerHttpEndpoint, testResultId).isInProgress());
          } catch (ConditionTimeoutException timeoutException) {
             log.info("Caught a ConditionTimeoutException for test on {}", testRequest.getTestEndpoint());
          }
 
          // Return the final result.
-         return refreshTestResult(testResultId);
+         return refreshTestResult(microcksContainerHttpEndpoint, testResultId);
       }
       if (log.isErrorEnabled()) {
          log.error("Couldn't launch on new test on Microcks with status {} ", response.statusCode());
@@ -264,7 +278,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       }
    }
 
-   private ObjectMapper getMapper() {
+   private static ObjectMapper getMapper() {
       if (mapper == null) {
          mapper = new ObjectMapper();
          // Do not include null values in both serialization and deserialization.
@@ -274,11 +288,11 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       return mapper;
    }
 
-   private TestResult refreshTestResult(String testResultId) throws IOException, InterruptedException {
+   private static TestResult refreshTestResult(String microcksContainerHttpEndpoint, String testResultId) throws IOException, InterruptedException {
       // Build a new client on correct API endpoint.
       HttpClient client = HttpClient.newHttpClient();
       HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(getHttpEndpoint() + "/api/tests/" + testResultId))
+            .uri(URI.create(microcksContainerHttpEndpoint + "/api/tests/" + testResultId))
             .header("Accept", ContentType.APPLICATION_JSON.getMimeType())
             .GET()
             .build();
