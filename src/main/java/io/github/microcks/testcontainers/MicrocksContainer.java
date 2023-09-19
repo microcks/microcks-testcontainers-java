@@ -22,9 +22,7 @@ import io.github.microcks.testcontainers.model.TestResult;
 import io.github.microcks.testcontainers.model.TestRequest;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import org.apache.http.HttpEntity;
 import org.apache.http.entity.ContentType;
-import org.apache.http.entity.mime.MultipartEntityBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
@@ -34,15 +32,16 @@ import org.testcontainers.shaded.org.awaitility.Awaitility;
 import org.testcontainers.shaded.org.awaitility.core.ConditionTimeoutException;
 import org.testcontainers.utility.DockerImageName;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.nio.channels.Channels;
-import java.nio.channels.Pipe;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.TimeUnit;
 
@@ -57,6 +56,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
 
    private static final String MICROCKS_FULL_IMAGE_NAME = "quay.io/microcks/microcks-uber";
    private static final DockerImageName MICROCKS_IMAGE = DockerImageName.parse(MICROCKS_FULL_IMAGE_NAME);
+   private static final String HTTP_UPLOAD_LINE_FEED = "\r\n";
 
    public static final int MICROCKS_HTTP_PORT = 8080;
    public static final int MICROCKS_GRPC_PORT = 9090;
@@ -193,25 +193,35 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     * @param testRequest The test specifications (API under test, endpoint, runner, ...)
     * @return The final TestResult containing information on success/failure as well as details on test cases.
     * @throws IOException If connection to Microcks container failed (no route to host, low-level network stuffs)
-    * @throws InterruptedException If connection to Microcks container is interrupted
     * @throws MicrocksException If Microcks fails creating a new test giving your request.
     */
-   public static TestResult testEndpoint(String microcksContainerHttpEndpoint, TestRequest testRequest) throws IOException, InterruptedException, MicrocksException {
+   public static TestResult testEndpoint(String microcksContainerHttpEndpoint, TestRequest testRequest) throws IOException, MicrocksException {
       String requestBody = getMapper().writeValueAsString(testRequest);
 
-      HttpClient client = HttpClient.newHttpClient();
-      HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(microcksContainerHttpEndpoint + "/api/tests"))
-            .header("Content-Type", ContentType.APPLICATION_JSON.getMimeType())
-            .POST(HttpRequest.BodyPublishers.ofString(requestBody, StandardCharsets.UTF_8))
-            .build();
+      // Build a new client on correct API endpoint.
+      URL url = new URL(microcksContainerHttpEndpoint + "/api/tests");
+      HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
+      httpConn.setRequestMethod("POST");
+      httpConn.setRequestProperty("Content-Type", ContentType.APPLICATION_JSON.getMimeType());
+      httpConn.setDoOutput(true);
 
-      // Send the request and parse status code.
-      log.debug("Sending a test request to Microcks container: {}", requestBody);
-      HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+      try (OutputStream os = httpConn.getOutputStream()) {
+         byte[] input = requestBody.getBytes(StandardCharsets.UTF_8);
+         os.write(input, 0, input.length);
+      }
 
-      if (response.statusCode() == 201) {
-         TestResult testResult = getMapper().readValue(response.body(), TestResult.class);
+      StringBuilder responseContent = new StringBuilder();
+      try (BufferedReader br = new BufferedReader(new InputStreamReader(httpConn.getInputStream(), StandardCharsets.UTF_8))) {
+         String responseLine;
+         while ((responseLine = br.readLine()) != null) {
+            responseContent.append(responseLine.trim());
+         }
+      }
+
+      if (httpConn.getResponseCode() == 201) {
+         httpConn.disconnect();
+
+         TestResult testResult = getMapper().readValue(responseContent.toString(), TestResult.class);
          log.debug("Got Test Result: {}, now polling for progression", testResult.getId());
 
          final String testResultId = testResult.getId();
@@ -229,53 +239,73 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          return refreshTestResult(microcksContainerHttpEndpoint, testResultId);
       }
       if (log.isErrorEnabled()) {
-         log.error("Couldn't launch on new test on Microcks with status {} ", response.statusCode());
-         log.error("Error response body is {}", response.body());
+         log.error("Couldn't launch on new test on Microcks with status {} ", httpConn.getResponseCode());
+         log.error("Error response body is {}", responseContent);
       }
+      httpConn.disconnect();
       throw new MicrocksException("Couldn't launch on new test on Microcks. Please check Microcks container logs");
    }
 
-   private void importArtifact(File artifact, boolean mainArtifact) throws IOException, InterruptedException, MicrocksException {
+   private void importArtifact(File artifact, boolean mainArtifact) throws IOException, MicrocksException {
       if (!artifact.exists()) {
          throw new IOException("Artifact " + artifact.getPath() + " does not exist or can't be read.");
       }
 
-      HttpEntity httpEntity = MultipartEntityBuilder.create()
-            .addBinaryBody("file", artifact, ContentType.APPLICATION_OCTET_STREAM, artifact.getName())
-            .build();
+      // Creates a unique boundary based on time stamp
+      String boundary = "===" + System.currentTimeMillis() + "===";
 
-      // Use pipeline streams to write the encoded data directly to the network instead of
-      // caching it in memory. Because Multipart request bodies contain files, they can cause
-      // memory overflows if cached in memory.
-      Pipe pipe = Pipe.open();
+      URL url = new URL(getHttpEndpoint() + "/api/artifact/upload" + (mainArtifact ? "" : "?mainArtifact=false"));
+      HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
+      httpConn.setUseCaches(false);
+      httpConn.setDoOutput(true);
+      httpConn.setDoInput(true);
+      httpConn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
 
-      // Pipeline streams must be used in a multi-threaded environment. Using one
-      // thread for simultaneous reads and writes can lead to deadlocks.
-      new Thread(() -> {
-         try (OutputStream outputStream = Channels.newOutputStream(pipe.sink())) {
-            // Write the encoded data to the pipeline.
-            httpEntity.writeTo(outputStream);
-         } catch (IOException e) {
-            log.error("Exception while transferring artifact content", e);
+      try (OutputStream os = httpConn.getOutputStream();
+           PrintWriter writer = new PrintWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8), true);
+           FileInputStream is = new FileInputStream(artifact)) {
+
+         writer.append("--" + boundary)
+               .append(HTTP_UPLOAD_LINE_FEED)
+               .append("Content-Disposition: form-data; name=\"file\"; filename=\"" + artifact.getName() + "\"")
+               .append(HTTP_UPLOAD_LINE_FEED)
+               .append("Content-Type: application/octet-stream")
+               .append(HTTP_UPLOAD_LINE_FEED)
+               .append("Content-Transfer-Encoding: binary")
+               .append(HTTP_UPLOAD_LINE_FEED)
+               .append(HTTP_UPLOAD_LINE_FEED);
+         writer.flush();
+
+         byte[] buffer = new byte[4096];
+         int bytesRead = -1;
+         while ((bytesRead = is.read(buffer)) != -1) {
+            os.write(buffer, 0, bytesRead);
          }
+         os.flush();
 
-      }).start();
-
-      // Build a new Http client.
-      HttpClient client = HttpClient.newHttpClient();
-      HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(getHttpEndpoint() + "/api/artifact/upload" + (mainArtifact ? "" : "?mainArtifact=false")))
-            .header("Content-Type", httpEntity.getContentType().getValue())
-            .POST(HttpRequest.BodyPublishers.ofInputStream(() -> Channels.newInputStream(pipe.source())))
-            .build();
-
-      // Send the request and parse status code.
-      HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-      if (response.statusCode() != 201) {
-         log.error("Artifact has not been correctly been imported: {}", response.body());
-         throw new MicrocksException("Artifact has not been correctly been imported: " + response.body());
+         // Finalize writer with a boundary before flushing.
+         writer.append(HTTP_UPLOAD_LINE_FEED)
+               .append("--" + boundary + "--")
+               .append(HTTP_UPLOAD_LINE_FEED).flush();
       }
+
+      if (httpConn.getResponseCode() != 201) {
+         // Read response content for diagnostic purpose.
+         StringBuilder responseContent = new StringBuilder();
+         try (BufferedReader br = new BufferedReader(new InputStreamReader(httpConn.getInputStream(), StandardCharsets.UTF_8))) {
+            String responseLine = null;
+            while ((responseLine = br.readLine()) != null) {
+               responseContent.append(responseLine.trim());
+            }
+         }
+         // Disconnect Http connection.
+         httpConn.disconnect();
+
+         log.error("Artifact has not been correctly been imported: {}", responseContent);
+         throw new MicrocksException("Artifact has not been correctly been imported: " + responseContent);
+      }
+      // Disconnect Http connection.
+      httpConn.disconnect();
    }
 
    private static ObjectMapper getMapper() {
@@ -288,18 +318,25 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       return mapper;
    }
 
-   private static TestResult refreshTestResult(String microcksContainerHttpEndpoint, String testResultId) throws IOException, InterruptedException {
+   private static TestResult refreshTestResult(String microcksContainerHttpEndpoint, String testResultId) throws IOException {
       // Build a new client on correct API endpoint.
-      HttpClient client = HttpClient.newHttpClient();
-      HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(microcksContainerHttpEndpoint + "/api/tests/" + testResultId))
-            .header("Accept", ContentType.APPLICATION_JSON.getMimeType())
-            .GET()
-            .build();
+      URL url = new URL(microcksContainerHttpEndpoint + "/api/tests/" + testResultId);
+      HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
+      httpConn.setRequestMethod("GET");
+      httpConn.setRequestProperty("Accept", ContentType.APPLICATION_JSON.getMimeType());
+      httpConn.setDoOutput(false);
 
-      // Send the request and parse status code.
-      HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+      // Send the request and parse response body.
+      StringBuilder content = new StringBuilder();
+      try (BufferedReader br = new BufferedReader(new InputStreamReader(httpConn.getInputStream()))) {
+         String inputLine;
+         while ((inputLine = br.readLine()) != null) {
+            content.append(inputLine);
+         }
+      }
+      // Disconnect Http connection.
+      httpConn.disconnect();
 
-      return getMapper().readValue(response.body(), TestResult.class);
+      return getMapper().readValue(content.toString(), TestResult.class);
    }
 }

@@ -53,7 +53,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <sonar.organization>microcks</sonar.organization>
     <sonar.host.url>https://sonarcloud.io</sonar.host.url>
-    <java.version>11</java.version>
+    <java.version>8</java.version>
     <testcontainers.version>1.18.3</testcontainers.version>
     <httpmime.version>4.5.14</httpmime.version>
     <jupiter.version>5.8.1</jupiter.version>
