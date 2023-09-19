@@ -22,7 +22,6 @@ import io.github.microcks.testcontainers.model.TestResult;
 import io.github.microcks.testcontainers.model.TestRequest;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import org.apache.http.entity.ContentType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
@@ -202,7 +201,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       URL url = new URL(microcksContainerHttpEndpoint + "/api/tests");
       HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
       httpConn.setRequestMethod("POST");
-      httpConn.setRequestProperty("Content-Type", ContentType.APPLICATION_JSON.getMimeType());
+      httpConn.setRequestProperty("Content-Type", "application/json");
       httpConn.setDoOutput(true);
 
       try (OutputStream os = httpConn.getOutputStream()) {
@@ -323,7 +322,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       URL url = new URL(microcksContainerHttpEndpoint + "/api/tests/" + testResultId);
       HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
       httpConn.setRequestMethod("GET");
-      httpConn.setRequestProperty("Accept", ContentType.APPLICATION_JSON.getMimeType());
+      httpConn.setRequestProperty("Accept", "application/json");
       httpConn.setDoOutput(false);
 
       // Send the request and parse response body.

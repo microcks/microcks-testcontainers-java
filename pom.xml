@@ -9,10 +9,10 @@
 
   <name>Microcks Testcontainers</name>
   <description>Microcks Testcontainers Java library</description>
-  <url>http://microcks.github.io</url>
+  <url>https://microcks.io</url>
   <organization>
     <name>Microcks</name>
-    <url>http://microcks.github.io</url>
+    <url>https://microcks.io</url>
   </organization>
 
   <licenses>
@@ -27,7 +27,7 @@
     <developer>
       <id>microcks</id>
       <name>Microcks Development Team</name>
-      <organizationUrl>https://microcks.github.io/</organizationUrl>
+      <organizationUrl>https://microcks.io/</organizationUrl>
     </developer>
   </developers>
 
@@ -55,7 +55,6 @@
     <sonar.host.url>https://sonarcloud.io</sonar.host.url>
     <java.version>8</java.version>
     <testcontainers.version>1.18.3</testcontainers.version>
-    <httpmime.version>4.5.14</httpmime.version>
     <jupiter.version>5.8.1</jupiter.version>
     <rest-assured.version>5.3.1</rest-assured.version>
   </properties>
@@ -65,11 +64,6 @@
       <groupId>org.testcontainers</groupId>
       <artifactId>testcontainers</artifactId>
       <version>${testcontainers.version}</version>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.httpcomponents</groupId>
-      <artifactId>httpmime</artifactId>
-      <version>${httpmime.version}</version>
     </dependency>
 
     <dependency>
