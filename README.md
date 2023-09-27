@@ -97,7 +97,7 @@ public void setupPort() {
 TestRequest testRequest = new TestRequest.Builder()
    .serviceId("API Pastries:0.0.1")
    .runnerType(TestRunnerType.OPEN_API_SCHEMA.name())
-   .testEndpoint("http://http://host.testcontainers.internal:" + port)
+   .testEndpoint("http://host.testcontainers.internal:" + port)
    .timeout(2000L)
    .build();
 
