@@ -165,6 +165,7 @@ public class MicrocksContainerTest {
             .build();
 
       testResult = microcks.testEndpoint(otherTestRequestDTO);
+      assertTrue(testResult.isSuccess());
       assertEquals("http://good-impl:3002", testResult.getTestedEndpoint());
       assertEquals(3, testResult.getTestCaseResults().size());
       assertEquals("", testResult.getTestCaseResults().get(0).getTestStepResults().get(0).getMessage());

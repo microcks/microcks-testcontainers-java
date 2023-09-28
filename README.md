@@ -81,8 +81,9 @@ The container also provides `getHttpEndpoint()` for raw access to those API endp
 
 ### Launching new contract-tests
 
-If you want to ensure that your application under test is conformant to an OpenAPI contract (or many contracts),
-you can launch a Microcks contract/conformance test using the local server port you're actually running:
+If you want to ensure that your application under test is conformant to an OpenAPI contract (or other type of contract),
+you can launch a Microcks contract/conformance test using the local server port you're actually running. This is
+typically how it could be done for a Spring Boot application: 
 
 ```java
 @LocalServerPort
@@ -93,16 +94,21 @@ public void setupPort() {
   // Host port exposition should be done here.
   Testcontainers.exposeHostPorts(port);
 }
-      
-TestRequest testRequest = new TestRequest.Builder()
-   .serviceId("API Pastries:0.0.1")
-   .runnerType(TestRunnerType.OPEN_API_SCHEMA.name())
-   .testEndpoint("http://host.testcontainers.internal:" + port)
-   .timeout(2000L)
-   .build();
+
+@Test
+public void testOpenAPIContract() throws Exception {
+   // Ask for an Open API conformance to be launched.
+   TestRequest testRequest = new TestRequest.Builder()
+      .serviceId("API Pastries:0.0.1")
+      .runnerType(TestRunnerType.OPEN_API_SCHEMA.name())
+      .testEndpoint("http://host.testcontainers.internal:" + port)
+      .timeout(2000L)
+      .build();
 
 TestResult testResult = microcks.testEndpoint(testRequest);
 assertTrue(testResult.isSuccess());
 ```
 
 The `TestResult` gives you access to all details regarding success of failure on different test cases.
+
+A comprehensive Spring Boot demo application illustrating both usages is available here: [spring-boot-order-service](https://github.com/microcks/api-lifecycle/tree/master/shift-left-demo/spring-boot-order-service). 
