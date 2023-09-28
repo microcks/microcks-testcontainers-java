@@ -86,26 +86,6 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    }
 
    /**
-    * Expose Http port as a fixed port on host. Must be called before the container is started
-    * otherwise it will have no effect.
-    * @param httpPort The port chosen for Http endpoint. It may raise conflicts later on during startup.
-    */
-   public void setHttpExposedPort(int httpPort) {
-      addFixedExposedPort(httpPort, MICROCKS_HTTP_PORT);
-      getExposedPorts().remove(Integer.valueOf(MICROCKS_HTTP_PORT));
-   }
-
-   /**
-    * Expose Grpc port as a fixed port on host. Must be called before the container is started
-    * otherwise it will have no effect.
-    * @param grpcPort The port chosen for Grpc endpoint. It may raise conflicts later on during startup.
-    */
-   public void setGrpcExposedPort(int grpcPort) {
-      addFixedExposedPort(grpcPort, MICROCKS_GRPC_PORT);
-      getExposedPorts().remove(Integer.valueOf(MICROCKS_GRPC_PORT));
-   }
-
-   /**
     * Get the Http endpoint where Microcks can be accessed (you'd have to append '/api' to access APIs)
     * @return The Http endpoint for talking to container.
     */
