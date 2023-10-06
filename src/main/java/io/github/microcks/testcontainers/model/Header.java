@@ -18,8 +18,12 @@
  */
 package io.github.microcks.testcontainers.model;
 
+import io.github.microcks.testcontainers.util.jackson.ArrayToStringDeserializer;
+import org.testcontainers.shaded.com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+
 /**
  * Data Transfer object for basic header with its values (comma separated string).
+ *
  * @author laurent
  */
 public class Header {
@@ -39,6 +43,7 @@ public class Header {
       return values;
    }
 
+   @JsonDeserialize(using = ArrayToStringDeserializer.class)
    public void setValues(String values) {
       this.values = values;
    }
