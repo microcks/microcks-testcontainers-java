@@ -18,10 +18,10 @@
  */
 package io.github.microcks.testcontainers;
 
+import io.github.microcks.testcontainers.model.Header;
+import io.github.microcks.testcontainers.model.TestRequest;
 import io.github.microcks.testcontainers.model.TestResult;
 import io.github.microcks.testcontainers.model.TestRunnerType;
-import io.github.microcks.testcontainers.model.TestRequest;
-
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import org.junit.Test;
@@ -31,10 +31,11 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 
 import java.io.File;
+import java.util.*;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * This is a test case for MicrocksContainer class.
@@ -169,5 +170,37 @@ public class MicrocksContainerTest {
       assertEquals("http://good-impl:3002", testResult.getTestedEndpoint());
       assertEquals(3, testResult.getTestCaseResults().size());
       assertEquals("", testResult.getTestCaseResults().get(0).getTestStepResults().get(0).getMessage());
+
+      // Test request with operations headers
+      List<Header> headers = new ArrayList<>();
+      Header requestHeader = new Header();
+      requestHeader.setName("X-Custom-Header-1");
+      requestHeader.setValues("value1,value2,value3");
+      headers.add(requestHeader);
+      Map<String, List<Header>> operationsHeaders = new HashMap<>();
+      operationsHeaders.put("GET /pastries", headers);
+      TestRequest testRequestWithHeadersDTO = new TestRequest.Builder()
+            .serviceId("API Pastries:0.0.1")
+            .runnerType(TestRunnerType.OPEN_API_SCHEMA.name())
+            .testEndpoint("http://good-impl:3002")
+            .operationsHeaders(operationsHeaders)
+            .timeout(2000L)
+            .build();
+
+      testResult = microcks.testEndpoint(testRequestWithHeadersDTO);
+      assertTrue(testResult.isSuccess());
+      assertEquals("http://good-impl:3002", testResult.getTestedEndpoint());
+      assertEquals(3, testResult.getTestCaseResults().size());
+      assertEquals("", testResult.getTestCaseResults().get(0).getTestStepResults().get(0).getMessage());
+      assertEquals(1, testResult.getOperationsHeaders().size());
+      assertTrue(testResult.getOperationsHeaders().containsKey("GET /pastries"));
+      assertEquals(1, testResult.getOperationsHeaders().get("GET /pastries").size());
+      Header resultHeader = testResult.getOperationsHeaders().get("GET /pastries").iterator().next();
+      assertEquals("X-Custom-Header-1", resultHeader.getName());
+      List<String> expectedValues = Arrays.asList("value1", "value2", "value3");
+      assertTrue(
+            Arrays.asList(resultHeader.getValues().split(",")).containsAll(expectedValues),
+            resultHeader.getValues() + " should contain in any order values : " + String.join(",", expectedValues)
+      );
    }
 }
