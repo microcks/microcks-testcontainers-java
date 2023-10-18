@@ -19,11 +19,13 @@ import io.github.microcks.testcontainers.model.TestRequest;
 import io.github.microcks.testcontainers.model.TestResult;
 import io.github.microcks.testcontainers.model.TestRunnerType;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import org.junit.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 import org.testcontainers.utility.DockerImageName;
 
 import java.io.File;
@@ -80,20 +82,21 @@ public class MicrocksContainersEnsembleTest {
       testRequest.setServiceId("API Pastries:0.0.1");
       testRequest.setRunnerType(TestRunnerType.POSTMAN.name());
       testRequest.setTestEndpoint("http://bad-impl:3002");
-      testRequest.setTimeout(2000l);
+      testRequest.setTimeout(2500l);
 
       // First test should fail with validation failure messages.
       TestResult testResult = microcks.testEndpoint(testRequest);
 
-      /*
-      System.err.println(microcks.getLogs());
+      //System.err.println(microcks.getLogs());
       ObjectMapper mapper = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
       System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(testResult));
-       */
 
       assertFalse(testResult.isSuccess());
       assertEquals("http://bad-impl:3002", testResult.getTestedEndpoint());
       assertEquals(3, testResult.getTestCaseResults().size());
+      // Postman runner stop at first failure so there's just 1 testStepResult per testCaseResult
+      assertEquals(1, testResult.getTestCaseResults().get(0).getTestStepResults().size());
+      // Order is not deterministic so it could be a matter of invalid size, invalid name or invalid price.
       assertTrue(testResult.getTestCaseResults().get(0).getTestStepResults().get(0).getMessage().contains("Valid size in response pastries")
             || testResult.getTestCaseResults().get(0).getTestStepResults().get(0).getMessage().contains("Valid name in response pastry")
             || testResult.getTestCaseResults().get(0).getTestStepResults().get(0).getMessage().contains("Valid price in response pastry"));
@@ -108,6 +111,9 @@ public class MicrocksContainersEnsembleTest {
             .build();
 
       testResult = microcks.testEndpoint(otherTestRequestDTO);
+
+      mapper = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
+      System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(testResult));
 
       assertTrue(testResult.isSuccess());
       assertEquals("http://good-impl:3003", testResult.getTestedEndpoint());
