@@ -11,7 +11,7 @@ Java library for Testcontainers that enables embedding Microcks into your JUnit 
 
 Latest released version is `0.1.4`.
 
-Current development version is `0.1.5-SNAPSHOT`.
+Current development version is `0.2.0-SNAPSHOT`.
 
 #### Sonarcloud Quality metrics
 
@@ -105,8 +105,9 @@ public void testOpenAPIContract() throws Exception {
       .timeout(2000L)
       .build();
 
-TestResult testResult = microcks.testEndpoint(testRequest);
-assertTrue(testResult.isSuccess());
+   TestResult testResult = microcks.testEndpoint(testRequest);
+   assertTrue(testResult.isSuccess());
+}
 ```
 
 The `TestResult` gives you access to all details regarding success of failure on different test cases.
