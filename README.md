@@ -50,7 +50,7 @@ You just have to specify the container image you'd like to use. This library req
 
 ```java
 MicrocksContainer microcks = new MicrocksContainer(
-      DockerImageName.parse("quay.io/microcks/microcks-uber:nightly"));
+      DockerImageName.parse("quay.io/microcks/microcks-uber:1.8.0"));
 microcks.start();
 ```
 
