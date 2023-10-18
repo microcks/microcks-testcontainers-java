@@ -19,13 +19,11 @@ import io.github.microcks.testcontainers.model.TestRequest;
 import io.github.microcks.testcontainers.model.TestResult;
 import io.github.microcks.testcontainers.model.TestRunnerType;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import org.junit.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 import org.testcontainers.utility.DockerImageName;
 
 import java.io.File;
@@ -106,14 +104,10 @@ public class MicrocksContainersEnsembleTest {
             .serviceId("API Pastries:0.0.1")
             .runnerType(TestRunnerType.POSTMAN.name())
             .testEndpoint("http://good-impl:3003")
-            .timeout(3000L)
+            .timeout(2500L)
             .build();
 
       testResult = microcks.testEndpoint(otherTestRequestDTO);
-
-      System.err.println(microcks.getLogs());
-      ObjectMapper mapper = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
-      System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(testResult));
 
       assertTrue(testResult.isSuccess());
       assertEquals("http://good-impl:3003", testResult.getTestedEndpoint());
