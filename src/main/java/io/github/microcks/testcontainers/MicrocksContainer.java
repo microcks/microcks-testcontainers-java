@@ -19,6 +19,7 @@ import io.github.microcks.testcontainers.model.TestResult;
 import io.github.microcks.testcontainers.model.TestRequest;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.github.dockerjava.api.command.InspectContainerResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
@@ -39,7 +40,11 @@ import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * Testcontainers implementation for main Microcks container.
@@ -58,6 +63,9 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    public static final int MICROCKS_GRPC_PORT = 9090;
 
    private static ObjectMapper mapper;
+
+   private Set<String> mainArtifactsToImport;
+   private Set<String> secondaryArtifactsToImport;
 
    /**
     * Build a new MicrocksContainer with its container image name as string. This image must
@@ -80,6 +88,44 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       withExposedPorts(MICROCKS_HTTP_PORT, MICROCKS_GRPC_PORT);
 
       waitingFor(Wait.forLogMessage(".*Started MicrocksApplication.*", 1));
+   }
+
+   /**
+    * Provide paths to artifacts that will be imported as primary or main ones within the Microcks container
+    * once it will be started and healthy.
+    * @param artifacts A set of paths to artifacts that will be loaded as classpath resources
+    * @return self
+    */
+   public MicrocksContainer withMainArtifacts(String... artifacts) {
+      if (mainArtifactsToImport == null) {
+         mainArtifactsToImport = new HashSet<>();
+      }
+      mainArtifactsToImport.addAll(Arrays.stream(artifacts).collect(Collectors.toList()));
+      return self();
+   }
+
+   /**
+    * Provide paths to artifacts that will be imported as secondary ones within the Microcks container
+    * once it will be started and healthy.
+    * @param artifacts A set of paths to artifacts that will be loaded as classpath resources
+    * @return self
+    */
+   public MicrocksContainer withSecondaryArtifacts(String... artifacts) {
+      if (secondaryArtifactsToImport == null) {
+         secondaryArtifactsToImport = new HashSet<>();
+      }
+      secondaryArtifactsToImport.addAll(Arrays.stream(artifacts).collect(Collectors.toList()));
+      return self();
+   }
+
+   @Override
+   protected void containerIsStarted(InspectContainerResponse containerInfo) {
+      if (mainArtifactsToImport != null && !mainArtifactsToImport.isEmpty()) {
+         mainArtifactsToImport.stream().forEach((String artifactPath) -> this.importArtifact(artifactPath, true));
+      }
+      if (secondaryArtifactsToImport != null && !secondaryArtifactsToImport.isEmpty()) {
+         secondaryArtifactsToImport.stream().forEach((String artifactPath) -> this.importArtifact(artifactPath, false));
+      }
    }
 
    /**
@@ -222,6 +268,23 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       throw new MicrocksException("Couldn't launch on new test on Microcks. Please check Microcks container logs");
    }
 
+   private void importArtifact(String artifactPath, boolean mainArtifact) {
+      URL resource = Thread.currentThread().getContextClassLoader().getResource(artifactPath);
+      if (resource == null) {
+         resource = MicrocksContainer.class.getClassLoader().getResource(artifactPath);
+         if (resource == null) {
+            log.warn("Could not load classpath artifact: {}", artifactPath);
+            throw new ArtifactLoadException("Error while importing artifact: " + artifactPath);
+         }
+      }
+      try {
+         importArtifact(new File(resource.getFile()), mainArtifact);
+      } catch (Exception e) {
+         log.error("Could not load classpath artifact: {}", artifactPath);
+         throw new ArtifactLoadException("Error while importing artifact: " + artifactPath, e);
+      }
+   }
+
    private void importArtifact(File artifact, boolean mainArtifact) throws IOException, MicrocksException {
       if (!artifact.exists()) {
          throw new IOException("Artifact " + artifact.getPath() + " does not exist or can't be read.");
@@ -314,5 +377,15 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       httpConn.disconnect();
 
       return getMapper().readValue(content.toString(), TestResult.class);
+   }
+
+   public static class ArtifactLoadException extends RuntimeException {
+
+      public ArtifactLoadException(String message) {
+         super(message);
+      }
+      public ArtifactLoadException(String message, Throwable cause) {
+         super(message, cause);
+      }
    }
 }

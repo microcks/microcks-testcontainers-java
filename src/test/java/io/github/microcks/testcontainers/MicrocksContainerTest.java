@@ -53,13 +53,13 @@ public class MicrocksContainerTest {
    @Test
    public void testMockingFunctionality() throws Exception {
       try (
-            MicrocksContainer microcks = new MicrocksContainer(IMAGE);
+            MicrocksContainer microcks = new MicrocksContainer(IMAGE)
+                  .withMainArtifacts("apipastries-openapi.yaml")
+                  .withSecondaryArtifacts("apipastries-postman-collection.json");
       ) {
          microcks.start();
          testMicrocksConfigRetrieval(microcks.getHttpEndpoint());
 
-         microcks.importAsMainArtifact(new File("target/test-classes/apipastries-openapi.yaml"));
-         microcks.importAsSecondaryArtifact(new File("target/test-classes/apipastries-postman-collection.json"));
          testMockEndpoints(microcks);
          testMicrocksMockingFunctionality(microcks);
       }
