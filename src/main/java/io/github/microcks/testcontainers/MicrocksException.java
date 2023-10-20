@@ -16,7 +16,7 @@
 package io.github.microcks.testcontainers;
 
 /**
- * Exception related to Microcks backend connnection.
+ * Exception related to Microcks backend connection.
  * @author laurent
  */
 public class MicrocksException extends Exception {
@@ -24,7 +24,7 @@ public class MicrocksException extends Exception {
    private static final long serialVersionUID = 527259357275701107L;
 
    /**
-    * Cerate a MicrocksException with text message.
+    * Create a MicrocksException with text message.
     * @param message This exception text message
     */
    public MicrocksException(String message) {

@@ -32,7 +32,7 @@ public class MicrocksContainersEnsemble implements Startable {
 
    private final Network network;
 
-   private final GenericContainer postman;
+   private final GenericContainer<?> postman;
    private final MicrocksContainer microcks;
 
    /**
@@ -61,7 +61,7 @@ public class MicrocksContainersEnsemble implements Startable {
       this.postman = new GenericContainer<>(DockerImageName.parse("quay.io/microcks/microcks-postman-runtime:latest"))
             .withNetwork(network)
             .withNetworkAliases("postman")
-            .waitingFor(Wait.forLogMessage(".*postman-runtime wrapper listening on port.*", 1));;
+            .waitingFor(Wait.forLogMessage(".*postman-runtime wrapper listening on port.*", 1));
    }
 
    /**
@@ -72,6 +72,28 @@ public class MicrocksContainersEnsemble implements Startable {
    public MicrocksContainersEnsemble withAccessToHost(boolean hostAccessible) {
       microcks.withAccessToHost(hostAccessible);
       postman.withAccessToHost(hostAccessible);
+      return this;
+   }
+
+   /**
+    * Provide paths to artifacts that will be imported as primary or main ones within the Microcks container
+    * once it will be started and healthy.
+    * @param artifacts A set of paths to artifacts that will be loaded as classpath resources
+    * @return self
+    */
+   public MicrocksContainersEnsemble withMainArtifacts(String... artifacts) {
+      microcks.withMainArtifacts(artifacts);
+      return this;
+   }
+
+   /**
+    * Provide paths to artifacts that will be imported as secondary ones within the Microcks container
+    * once it will be started and healthy.
+    * @param artifacts A set of paths to artifacts that will be loaded as classpath resources
+    * @return self
+    */
+   public MicrocksContainersEnsemble withSecondaryArtifacts(String... artifacts) {
+      microcks.withSecondaryArtifacts(artifacts);
       return this;
    }
 
@@ -91,12 +113,22 @@ public class MicrocksContainersEnsemble implements Startable {
       return microcks;
    }
 
+   /**
+    * Get the wrapped Postman runtime container to access management methods.
+    * @return The wrapped Postman runtime container
+    */
+   public GenericContainer<?> getPostmanContainer() {
+      return postman;
+   }
+
    @Override
    public void start() {
       // Sequential start to avoid resource contention on CI systems with weaker hardware.
       microcks.start();
       postman.start();
    }
+
+
 
    @Override
    public void stop() {

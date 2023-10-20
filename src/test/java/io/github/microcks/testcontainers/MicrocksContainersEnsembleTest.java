@@ -44,6 +44,21 @@ public class MicrocksContainersEnsembleTest {
    private static final DockerImageName GOOD_PASTRY_IMAGE = DockerImageName.parse("quay.io/microcks/contract-testing-demo:03");
 
    @Test
+   public void testMockingFunctionality() throws Exception {
+      try (
+            MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(IMAGE)
+                  .withMainArtifacts("apipastries-openapi.yaml")
+                  .withSecondaryArtifacts("apipastries-postman-collection.json")
+                  .withAccessToHost(true);
+      ) {
+         ensemble.start();
+         testMicrocksConfigRetrieval(ensemble.getMicrocksContainer().getHttpEndpoint());
+
+         testMicrocksMockingFunctionality(ensemble.getMicrocksContainer());
+      }
+   }
+
+   @Test
    public void testPostmanContractTestingFunctionality() throws Exception {
       try (
             MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(IMAGE);
@@ -74,6 +89,28 @@ public class MicrocksContainersEnsembleTest {
             .thenReturn();
 
       assertEquals(200, keycloakConfig.getStatusCode());
+   }
+
+   private void testMicrocksMockingFunctionality(MicrocksContainer microcks) {
+      String baseApiUrl = microcks.getRestMockEndpoint("API Pastries", "0.0.1");
+
+      // Check that mock from main/primary artifact has been loaded.
+      Response millefeuille = RestAssured.given().when()
+            .get(baseApiUrl + "/pastries/Millefeuille")
+            .thenReturn();
+
+      assertEquals(200, millefeuille.getStatusCode());
+      assertEquals("Millefeuille", millefeuille.jsonPath().get("name"));
+      //millefeuille.getBody().prettyPrint();
+
+      // Check that mock from secondary artifact has been loaded.
+      Response eclairChocolat = RestAssured.given().when()
+            .get(baseApiUrl + "/pastries/Eclair Chocolat")
+            .thenReturn();
+
+      assertEquals(200, eclairChocolat.getStatusCode());
+      assertEquals("Eclair Chocolat", eclairChocolat.jsonPath().get("name"));
+      //eclairChocolat.getBody().prettyPrint();
    }
 
    private void testMicrocksContractTestingFunctionality(MicrocksContainer microcks, GenericContainer badImpl, GenericContainer goodImpl) throws Exception {
