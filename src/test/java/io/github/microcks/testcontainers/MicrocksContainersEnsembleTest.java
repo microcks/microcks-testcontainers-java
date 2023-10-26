@@ -119,14 +119,16 @@ public class MicrocksContainersEnsembleTest {
       testRequest.setServiceId("API Pastries:0.0.1");
       testRequest.setRunnerType(TestRunnerType.POSTMAN.name());
       testRequest.setTestEndpoint("http://bad-impl:3002");
-      testRequest.setTimeout(2500l);
+      testRequest.setTimeout(5000l);
 
       // First test should fail with validation failure messages.
       TestResult testResult = microcks.testEndpoint(testRequest);
 
-      //System.err.println(microcks.getLogs());
+      /*
+      System.err.println(microcks.getLogs());
       ObjectMapper mapper = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
       System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(testResult));
+       */
 
       assertFalse(testResult.isSuccess());
       assertEquals("http://bad-impl:3002", testResult.getTestedEndpoint());
@@ -144,13 +146,15 @@ public class MicrocksContainersEnsembleTest {
             .serviceId("API Pastries:0.0.1")
             .runnerType(TestRunnerType.POSTMAN.name())
             .testEndpoint("http://good-impl:3003")
-            .timeout(2500L)
+            .timeout(5000L)
             .build();
 
       testResult = microcks.testEndpoint(otherTestRequestDTO);
 
+      /*
       mapper = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
       System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(testResult));
+       */
 
       assertTrue(testResult.isSuccess());
       assertEquals("http://good-impl:3003", testResult.getTestedEndpoint());
