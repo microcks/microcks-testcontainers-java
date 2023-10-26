@@ -9,9 +9,9 @@ Java library for Testcontainers that enables embedding Microcks into your JUnit 
 
 ## Build Status
 
-Latest released version is `0.1.4`.
+Latest released version is `0.2.0`.
 
-Current development version is `0.2.0-SNAPSHOT`.
+Current development version is `0.2.1-SNAPSHOT`.
 
 #### Sonarcloud Quality metrics
 
@@ -32,7 +32,7 @@ If you're using Maven:
 <dependency>
   <groupId>io.github.microcks</groupId>
   <artifactId>microcks-testcontainers</artifactId>
-  <version>0.1.4</version>
+  <version>0.2.0</version>
 </dependency>
 ```
 
@@ -40,7 +40,7 @@ or if you're using Gradle:
 
 ```groovy
 dependencies {
-    testImplementation 'io.github.microcks:microcks-testcontainers:0.1.4'
+    testImplementation 'io.github.microcks:microcks-testcontainers:0.2.0'
 }
 ```
 
@@ -58,6 +58,17 @@ microcks.start();
 
 To use Microcks mocks or contract-testing features, you first need to import OpenAPI, Postman Collection, GraphQL or gRPC artifacts. 
 Artifacts can be imported as main/Primary ones or as secondary ones. See [Multi-artifacts support](https://microcks.io/documentation/using/importers/#multi-artifacts-support) for details.
+
+You can do it before starting the container using simple paths:
+
+```java
+MicrocksContainer microcks = new MicrocksContainer(DockerImageName.parse("quay.io/microcks/microcks-uber:1.8.0"))
+    .withMainArtifacts("apipastries-openapi.yaml")
+    .withSecondaryArtifacts("apipastries-postman-collection.json");
+microcks.start();
+```
+
+or once the container started using `File` arguments:
 
 ```java
 microcks.importAsMainArtifact(new File("target/test-classes/apipastries-openapi.yaml"));
@@ -91,25 +102,76 @@ private Integer port;
 
 @BeforeEach
 public void setupPort() {
-  // Host port exposition should be done here.
-  Testcontainers.exposeHostPorts(port);
+   // Host port exposition should be done here.
+   Testcontainers.exposeHostPorts(port);
 }
 
 @Test
 public void testOpenAPIContract() throws Exception {
-   // Ask for an Open API conformance to be launched.
-   TestRequest testRequest = new TestRequest.Builder()
-      .serviceId("API Pastries:0.0.1")
-      .runnerType(TestRunnerType.OPEN_API_SCHEMA.name())
-      .testEndpoint("http://host.testcontainers.internal:" + port)
-      .timeout(2000L)
-      .build();
+    // Ask for an Open API conformance to be launched.
+    TestRequest testRequest = new TestRequest.Builder()
+        .serviceId("API Pastries:0.0.1")
+        .runnerType(TestRunnerType.OPEN_API_SCHEMA.name())
+        .testEndpoint("http://host.testcontainers.internal:" + port)
+        .timeout(2000L)
+        .build();
 
-   TestResult testResult = microcks.testEndpoint(testRequest);
-   assertTrue(testResult.isSuccess());
+    TestResult testResult = microcks.testEndpoint(testRequest);
+    assertTrue(testResult.isSuccess());
 }
 ```
 
 The `TestResult` gives you access to all details regarding success of failure on different test cases.
 
-A comprehensive Spring Boot demo application illustrating both usages is available here: [spring-boot-order-service](https://github.com/microcks/api-lifecycle/tree/master/shift-left-demo/spring-boot-order-service). 
+A comprehensive Spring Boot demo application illustrating both usages is available here: [spring-boot-order-service](https://github.com/microcks/api-lifecycle/tree/master/shift-left-demo/spring-boot-order-service).
+
+### Advanced features with MicrocksContainersEnsemble
+
+The `MicrocksContainer` referenced above supports essential features of Microcks provided by the main Microcks container.
+The list of supported features is the following:
+
+* Mocking of REST APIs using different kinds of artifacts,
+* Contract-testing of REST APIs using `OPEN_API_SCHEMA` runner/strategy,
+* Mocking and contract-testing of SOAP WebServices,
+* Mocking and contract-testing of GraphQL APIs,
+* Mocking and contract-testing of gRPC APIs.
+
+To support features like `POSTMAN` contract-testing, we introduced `MicrocksContainersEnsemble` that allows managing
+additional Microks services. `MicrocksContainersEnsemble` allow you to implement
+[Different levels of API contract testing](https://medium.com/@lbroudoux/different-levels-of-api-contract-testing-with-microcks-ccc0847f8c97)
+in the Inner Loop with Testcontainers!
+
+A `MicrocksContainersEnsemble` conforms to Testcontaierns lifecycle methods and presents roughly the same interface
+as a `MicrocksContainers`. You can create and build an ensemble that way:
+
+```java
+MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(IMAGE)
+    .withMainArtifacts("apipastries-openapi.yaml")
+    .withSecondaryArtifacts("apipastries-postman-collection.json")
+    .withAccessToHost(true);
+ensemble.start();
+```
+
+A `MicrocksContainer` is wrapped by an ensemble and is still available to import artifacts and execute test methods.
+You have to access it using:
+
+```java
+MicrocksContainer microcks = ensemble.getMicrocksContainer();
+microcks.importAsMainArtifact(...);
+microcks.getLogs();
+```
+
+You can execute a `POSTMAN` test using an ensemble that way:
+
+```java
+TestRequest testRequest = new TestRequest.Builder()
+    .serviceId("API Pastries:0.0.1")
+    .runnerType(TestRunnerType.POSTMAN.name())
+    .testEndpoint("http://good-impl:3003")
+    .timeout(2500L)
+    .build();
+
+TestResult testResult = ensemble.getMicrocksContainer().testEndpoint(testRequest);
+```
+
+Please refer to our [MicrocksContainerTest](https://github.com/microcks/microcks-testcontainers-java/blob/main/src/test/java/io/github/microcks/testcontainers/MicrocksContainersEnsembleTest.java) for comprehensive example on how to use it.

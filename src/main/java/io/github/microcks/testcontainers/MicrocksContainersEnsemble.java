@@ -128,8 +128,6 @@ public class MicrocksContainersEnsemble implements Startable {
       postman.start();
    }
 
-
-
    @Override
    public void stop() {
       allContainers().parallel().forEach(GenericContainer::stop);
