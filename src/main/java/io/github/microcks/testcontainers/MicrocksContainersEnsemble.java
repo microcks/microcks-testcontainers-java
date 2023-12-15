@@ -32,7 +32,8 @@ public class MicrocksContainersEnsemble implements Startable {
 
    private final Network network;
 
-   private final GenericContainer<?> postman;
+   private GenericContainer<?> postman;
+   private MicrocksAsyncMinionContainer asyncMinion;
    private final MicrocksContainer microcks;
 
    /**
@@ -48,7 +49,6 @@ public class MicrocksContainersEnsemble implements Startable {
     * Build a new MicrocksContainersEnsemble with a pre-existing network and with its base container full image name.
     * This image must be compatible with quay.io/microcks/microcks-uber image.
     * @param network The network to attach ensemble containers to.
-    * @param image The name (with tag/version) of Microcks Uber distribution to use.
     */
    public MicrocksContainersEnsemble(Network network, String image) {
       this.network = network;
@@ -56,12 +56,48 @@ public class MicrocksContainersEnsemble implements Startable {
             .withNetwork(network)
             .withNetworkAliases("microcks")
             .withEnv("POSTMAN_RUNNER_URL", "http://postman:3000")
-            .withEnv("TEST_CALLBACK_URL", "http://microcks:8080");
+            .withEnv("TEST_CALLBACK_URL", "http://microcks:" + MicrocksContainer.MICROCKS_HTTP_PORT)
+            .withEnv("ASYNC_MINION_URL", "http://microcks-async-minion:" + MicrocksAsyncMinionContainer.MICROCKS_ASYNC_MINION_HTTP_PORT);
+   }
 
-      this.postman = new GenericContainer<>(DockerImageName.parse("quay.io/microcks/microcks-postman-runtime:latest"))
+   /**
+    * Enable the Postman runtime container with default container image.
+    * @return self
+    */
+   public MicrocksContainersEnsemble withPostman() {
+      return withPostman("quay.io/microcks/microcks-postman-runtime:latest");
+   }
+
+   /**
+    * Enable the Postman runtime container with provided container image.
+    * @param image The name (with tag/version) of Microcks Postman runtime to use.
+    * @return self
+    */
+   public MicrocksContainersEnsemble withPostman(String image) {
+      this.postman = new GenericContainer<>(DockerImageName.parse(image))
             .withNetwork(network)
             .withNetworkAliases("postman")
             .waitingFor(Wait.forLogMessage(".*postman-runtime wrapper listening on port.*", 1));
+      return this;
+   }
+
+   /**
+    * Enable the Async Feature container with default container image (deduced from Microcks main one).
+    * @return self
+    */
+   public MicrocksContainersEnsemble withAsyncFeature() {
+      String image = microcks.getDockerImageName().replace("microcks-uber", "microcks-uber-async-minion");
+      return withAsyncFeature(image);
+   }
+
+   /**
+    * Enable the Async Feature container with provided container image.
+    * @param image The name (with tag/version) of Microcks Async Minion Uber distribution to use.
+    * @return self
+    */
+   public MicrocksContainersEnsemble withAsyncFeature(String image) {
+      this.asyncMinion = new MicrocksAsyncMinionContainer(network, image, microcks);
+      return this;
    }
 
    /**
@@ -71,7 +107,12 @@ public class MicrocksContainersEnsemble implements Startable {
     */
    public MicrocksContainersEnsemble withAccessToHost(boolean hostAccessible) {
       microcks.withAccessToHost(hostAccessible);
-      postman.withAccessToHost(hostAccessible);
+      if (postman != null) {
+         postman.withAccessToHost(hostAccessible);
+      }
+      if (asyncMinion != null) {
+         asyncMinion.withAccessToHost(hostAccessible);
+      }
       return this;
    }
 
@@ -121,11 +162,24 @@ public class MicrocksContainersEnsemble implements Startable {
       return postman;
    }
 
+   /**
+    * Get the wrapped Async Minion container to access management methods.
+    * @return The wrapped Async minion container
+    */
+   public MicrocksAsyncMinionContainer getAsyncMinionContainer() {
+      return asyncMinion;
+   }
+
    @Override
    public void start() {
       // Sequential start to avoid resource contention on CI systems with weaker hardware.
       microcks.start();
-      postman.start();
+      if (postman != null) {
+         postman.start();
+      }
+      if (asyncMinion != null) {
+         asyncMinion.start();
+      }
    }
 
    @Override
@@ -134,6 +188,13 @@ public class MicrocksContainersEnsemble implements Startable {
    }
 
    private Stream<GenericContainer<?>> allContainers() {
-      return Stream.of(microcks, postman);
+      Stream<GenericContainer<?>> stream = Stream.of(microcks);
+      if (postman != null) {
+         stream = Stream.concat(stream, Stream.of(postman));
+      }
+      if (asyncMinion != null) {
+         stream = Stream.concat(stream, Stream.of(asyncMinion));
+      }
+      return stream;
    }
 }

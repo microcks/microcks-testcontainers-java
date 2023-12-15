@@ -1,0 +1,91 @@
+/*
+ * Copyright The Microcks Authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.github.microcks.testcontainers;
+
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.utility.DockerImageName;
+
+/**
+ * Testcontainers implementation for Async Minion container. Instances of this class are not meant to
+ * be created directly but through a {@code MicrocksContainersEnsemble}.
+ * @author laurent
+ */
+public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsyncMinionContainer> {
+
+   private static final String MICROCKS_ASYNC_MINION_FULL_IMAGE_NAME = "quay.io/microcks/microcks-uber-async-minion";
+   private static final DockerImageName MICROCKS_ASYNC_MINION_IMAGE = DockerImageName.parse(MICROCKS_ASYNC_MINION_FULL_IMAGE_NAME);
+
+   public static final int MICROCKS_ASYNC_MINION_HTTP_PORT = 8081;
+
+   /**
+    * Build a new MicrocksAsyncMinionContainer with its container image name as string. This image must
+    * be compatible with quay.io/microcks/microcks-uber-async-minion image.
+    * @param network The network to attach this container to.
+    * @param image The name (with tag/version) of Microcks Async Minion Uber distribution to use.
+    * @param microcks The microcks container this minion will be bound to.
+    */
+   public MicrocksAsyncMinionContainer(Network network, String image, MicrocksContainer microcks) {
+      this(network, DockerImageName.parse(image), microcks);
+   }
+
+   /**
+    * Build a new MicrocksAsyncMinionContainer with its container image name as string. This image must
+    * be compatible with quay.io/microcks/microcks-uber-async-minion image.
+    * @param network The network to attach this container to.
+    * @param imageName The name of Microcks Async Minion Uber distribution to use.
+    * @param microcks The microcks container this minion will be bound to.
+    */
+   public MicrocksAsyncMinionContainer(Network network, DockerImageName imageName, MicrocksContainer microcks) {
+      super(imageName);
+      imageName.assertCompatibleWith(MICROCKS_ASYNC_MINION_IMAGE);
+
+      withNetwork(network);
+      withNetworkAliases("microcks-async-minion");
+      withEnv("MICROCKS_HOST_PORT", "microcks:" + MicrocksContainer.MICROCKS_HTTP_PORT);
+      withExposedPorts(MICROCKS_ASYNC_MINION_HTTP_PORT);
+
+      waitingFor(Wait.forLogMessage(".*Profile prod activated\\..*", 1));
+      dependsOn(microcks);
+   }
+
+   /**
+    * Get the Http endpoint where Microcks can be accessed (you'd have to append '/api' to access APIs)
+    * @return The Http endpoint for talking to container.
+    */
+   public String getHttpEndpoint() {
+      return String.format("http://%s:%s", getHost(), getMappedPort(MICROCKS_ASYNC_MINION_HTTP_PORT));
+   }
+
+   /**
+    * Get the exposed mock endpoints for a WebSocket Service.
+    * @param service THe name of Service/API
+    * @param version The version of Service/API
+    * @param operationName The name of operation to get the endpoint for
+    * @return A usable endpoint to interact with Microcks mocks.
+    */
+   public String getWSMockEndpoint(String service, String version, String operationName) {
+      // operationName may start with SUBSCRIBE or PUBLISH.
+      if (operationName.indexOf(" ") != -1) {
+         operationName = operationName.split(" ")[1];
+      }
+      return String.format("ws://%s:%s/api/ws/%s/%s/%s", getHost(), getMappedPort(MICROCKS_ASYNC_MINION_HTTP_PORT),
+            service.replace(" ", "+"),
+            version.replace(" ", "+"),
+            operationName);
+   }
+}

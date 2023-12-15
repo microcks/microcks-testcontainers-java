@@ -18,19 +18,28 @@ package io.github.microcks.testcontainers;
 import io.github.microcks.testcontainers.model.TestRequest;
 import io.github.microcks.testcontainers.model.TestResult;
 import io.github.microcks.testcontainers.model.TestRunnerType;
+import io.github.microcks.testcontainers.model.TestStepResult;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
+import org.java_websocket.client.WebSocketClient;
+import org.java_websocket.drafts.Draft_6455;
+import org.java_websocket.handshake.ServerHandshake;
 import org.junit.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 import org.testcontainers.utility.DockerImageName;
 
 import java.io.File;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
 
 /**
  * This is a test case for MicrocksContainersEnsemble class.
@@ -42,6 +51,9 @@ public class MicrocksContainersEnsembleTest {
 
    private static final DockerImageName BAD_PASTRY_IMAGE = DockerImageName.parse("quay.io/microcks/contract-testing-demo:02");
    private static final DockerImageName GOOD_PASTRY_IMAGE = DockerImageName.parse("quay.io/microcks/contract-testing-demo:03");
+
+   private static final DockerImageName BAD_PASTRY_ASYNC_IMAGE = DockerImageName.parse("quay.io/microcks/contract-testing-demo-async:01");
+   private static final DockerImageName GOOD_PASTRY_ASYNC_IMAGE = DockerImageName.parse("quay.io/microcks/contract-testing-demo-async:02");
 
    @Test
    public void testMockingFunctionality() throws Exception {
@@ -61,7 +73,7 @@ public class MicrocksContainersEnsembleTest {
    @Test
    public void testPostmanContractTestingFunctionality() throws Exception {
       try (
-            MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(IMAGE);
+            MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(IMAGE).withPostman();
 
             GenericContainer<?> badImpl = new GenericContainer<>(BAD_PASTRY_IMAGE)
                   .withNetwork(ensemble.getNetwork())
@@ -80,6 +92,45 @@ public class MicrocksContainersEnsembleTest {
          ensemble.getMicrocksContainer().importAsMainArtifact(new File("target/test-classes/apipastries-openapi.yaml"));
          ensemble.getMicrocksContainer().importAsSecondaryArtifact(new File("target/test-classes/apipastries-postman-collection.json"));
          testMicrocksContractTestingFunctionality(ensemble.getMicrocksContainer(), badImpl, goodImpl);
+      }
+   }
+
+   @Test
+   public void testAsyncFeatureMockingFunctionality() throws Exception {
+      try (
+            MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble("quay.io/microcks/microcks-uber:nightly")
+                  .withMainArtifacts("pastry-orders-asyncapi.yml")
+                  .withAsyncFeature();
+      ) {
+         ensemble.start();
+         testMicrocksConfigRetrieval(ensemble.getMicrocksContainer().getHttpEndpoint());
+
+         testMicrocksAsyncMockingFunctionality(ensemble);
+      }
+   }
+
+   @Test
+   public void testAsyncFeatureTestingFunctionality() throws Exception {
+      try (
+            MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble("quay.io/microcks/microcks-uber:nightly")
+                  .withMainArtifacts("pastry-orders-asyncapi.yml")
+                  .withAsyncFeature();
+
+            GenericContainer<?> badImpl = new GenericContainer<>(BAD_PASTRY_ASYNC_IMAGE)
+                  .withNetwork(ensemble.getNetwork())
+                  .withNetworkAliases("bad-impl")
+                  .waitingFor(Wait.forLogMessage(".*Starting WebSocket server on ws://localhost:4001/websocket.*", 1));
+            GenericContainer<?> goodImpl = new GenericContainer<>(GOOD_PASTRY_ASYNC_IMAGE)
+                  .withNetwork(ensemble.getNetwork())
+                  .withNetworkAliases("good-impl")
+                  .waitingFor(Wait.forLogMessage(".*Starting WebSocket server on ws://localhost:4002/websocket.*", 1));
+      ) {
+         ensemble.start();
+         badImpl.start();
+         goodImpl.start();
+         testMicrocksConfigRetrieval(ensemble.getMicrocksContainer().getHttpEndpoint());
+
+         testMicrocksAsyncContractTestingFunctionality(ensemble);
       }
    }
 
@@ -159,6 +210,112 @@ public class MicrocksContainersEnsembleTest {
       assertTrue(testResult.isSuccess());
       assertEquals("http://good-impl:3003", testResult.getTestedEndpoint());
       assertEquals(3, testResult.getTestCaseResults().size());
+      assertNull(testResult.getTestCaseResults().get(0).getTestStepResults().get(0).getMessage());
+   }
+
+   private void testMicrocksAsyncMockingFunctionality(MicrocksContainersEnsemble ensemble) {
+      String wsEndpoint = ensemble.getAsyncMinionContainer().getWSMockEndpoint("Pastry orders API", "0.1.0", "SUBSCRIBE pastry/orders");
+      String expectedMessage = "{\"id\":\"4dab240d-7847-4e25-8ef3-1530687650c8\",\"customerId\":\"fe1088b3-9f30-4dc1-a93d-7b74f0a072b9\",\"status\":\"VALIDATED\",\"productQuantities\":[{\"quantity\":2,\"pastryName\":\"Croissant\"},{\"quantity\":1,\"pastryName\":\"Millefeuille\"}]}";
+
+      List<String> messages = new ArrayList<>();
+      try {
+         // Open a WebSocket client.
+         WebSocketClient wsClient = new WebSocketClient(new URI(wsEndpoint), new Draft_6455()) {
+            @Override
+            public void onMessage(String message) {
+               messages.add(message);
+            }
+            @Override
+            public void onOpen(ServerHandshake handshake) {
+            }
+            @Override
+            public void onClose(int code, String reason, boolean remote) {
+            }
+            @Override
+            public void onError(Exception e) {
+            }
+         };
+         wsClient.connect();
+
+         // Wait 7 seconds for messages from Async Minion WebSocket to get at least 2 messages.
+         await()
+               .pollDelay(7, TimeUnit.SECONDS)
+               .untilAsserted(() -> assertTrue(true));
+      } catch (URISyntaxException ex) {
+         fail("URISyntaxException exception: " + ex.getMessage());
+      }
+
+      assertFalse(messages.isEmpty());
+      for (String message : messages) {
+         assertEquals(expectedMessage, message);
+      }
+   }
+
+   private void testMicrocksAsyncContractTestingFunctionality(MicrocksContainersEnsemble ensemble) throws Exception {
+
+      // Produce a new test request.
+      TestRequest testRequest = new TestRequest();
+      testRequest.setServiceId("Pastry orders API:0.1.0");
+      testRequest.setRunnerType(TestRunnerType.ASYNC_API_SCHEMA.name());
+      testRequest.setTestEndpoint("ws://bad-impl:4001/websocket");
+      testRequest.setTimeout(7000l);
+
+      // First test should fail with validation failure messages.
+      // We're using a CompletableFuture here because in real test, you may want
+      // to execute your application and send a bunch of messages.
+      CompletableFuture<TestResult> testResultFuture = ensemble.getMicrocksContainer().testEndpointAsync(testRequest);
+      long start = System.currentTimeMillis();
+
+      TestResult testResult = null;
+      try {
+         testResult = testResultFuture.get();
+      } catch (Exception e) {
+         fail("Got an exception while waiting for test completion", e);
+      }
+
+      // Be sure the completion mechanism actually works and that you get the result only
+      // after the timeout.
+      long duration = System.currentTimeMillis() - start;
+      assertTrue(duration > 7000);
+
+      /*
+      ObjectMapper mapper = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
+      System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(testResult));
+      */
+
+      assertFalse(testResult.isSuccess());
+      assertEquals("ws://bad-impl:4001/websocket", testResult.getTestedEndpoint());
+
+      // Ensure we had at least grab one message.
+      assertFalse(testResult.getTestCaseResults().get(0).getTestStepResults().isEmpty());
+      TestStepResult testStepResult = testResult.getTestCaseResults().get(0).getTestStepResults().get(0);
+      assertTrue(testStepResult.getMessage().contains("object has missing required properties ([\"status\"]"));
+
+      // Switch endpoint to the correct implementation.
+      // Other way of doing things via builder and fluent api.
+      TestRequest otherTestRequestDTO = new TestRequest.Builder()
+            .serviceId("Pastry orders API:0.1.0")
+            .runnerType(TestRunnerType.ASYNC_API_SCHEMA.name())
+            .testEndpoint("ws://good-impl:4002/websocket")
+            .timeout(7000L)
+            .build();
+
+      try {
+         testResult = ensemble.getMicrocksContainer().testEndpointAsync(otherTestRequestDTO).get();
+      } catch (Exception e) {
+         fail("Got an exception while waiting for test completion", e);
+      }
+
+      /*
+      mapper = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
+      System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(testResult));
+      */
+
+      assertTrue(testResult.isSuccess());
+      assertEquals("ws://good-impl:4002/websocket", testResult.getTestedEndpoint());
+
+      // Ensure we had at least grab one message.
+      assertFalse(testResult.getTestCaseResults().get(0).getTestStepResults().isEmpty());
       assertNull(testResult.getTestCaseResults().get(0).getTestStepResults().get(0).getMessage());
    }
 }

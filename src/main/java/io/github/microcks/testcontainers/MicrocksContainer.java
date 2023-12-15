@@ -43,6 +43,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -209,6 +211,21 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    }
 
    /**
+    *
+    * @param testRequest
+    * @return
+    */
+   public CompletableFuture<TestResult> testEndpointAsync(TestRequest testRequest) {
+      return CompletableFuture.supplyAsync(() -> {
+         try {
+            return MicrocksContainer.testEndpoint(getHttpEndpoint(), testRequest);
+         } catch (Exception e) {
+            throw new CompletionException(e);
+         }
+      });
+   }
+
+   /**
     * Launch a conformance test on an endpoint. This may be a fallback to non-static {@code testEndpoint(TestRequest testRequest)}
     * method if you don't have direct access to the MicrocksContainer instance you want to run this test on.
     * @param microcksContainerHttpEndpoint The Http endpoint where to reach running MicrocksContainer
@@ -249,7 +266,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          final String testResultId = testResult.getId();
          try {
             Awaitility.await()
-                  .atMost(testRequest.getTimeout(), TimeUnit.MILLISECONDS)
+                  .atMost(testRequest.getTimeout() + 500, TimeUnit.MILLISECONDS)
                   .pollDelay(100, TimeUnit.MILLISECONDS)
                   .pollInterval(200, TimeUnit.MILLISECONDS)
                   .until(() -> !refreshTestResult(microcksContainerHttpEndpoint, testResultId).isInProgress());
