@@ -19,6 +19,10 @@ channels:
 components:
   messages:
     PastryOrder:
+      bindings:
+        kafka:
+          key:
+            type: string
       payload:
         type: object
         additionalProperties: false

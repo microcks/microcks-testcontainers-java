@@ -15,6 +15,8 @@
  */
 package io.github.microcks.testcontainers;
 
+import io.github.microcks.testcontainers.connection.KafkaConnection;
+
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -97,6 +99,19 @@ public class MicrocksContainersEnsemble implements Startable {
     */
    public MicrocksContainersEnsemble withAsyncFeature(String image) {
       this.asyncMinion = new MicrocksAsyncMinionContainer(network, image, microcks);
+      return this;
+   }
+
+   /**
+    *
+    * @param connection
+    * @return self
+    */
+   public MicrocksContainersEnsemble withKafkaConnection(KafkaConnection connection) {
+      if (this.asyncMinion == null) {
+         throw new IllegalStateException("Async feature must have been enabled first");
+      }
+      this.asyncMinion.withKafkaConnection(connection);
       return this;
    }
 

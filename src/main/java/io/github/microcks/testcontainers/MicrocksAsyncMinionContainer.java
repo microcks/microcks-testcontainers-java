@@ -15,6 +15,8 @@
  */
 package io.github.microcks.testcontainers;
 
+import io.github.microcks.testcontainers.connection.KafkaConnection;
+
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -31,6 +33,9 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
    private static final DockerImageName MICROCKS_ASYNC_MINION_IMAGE = DockerImageName.parse(MICROCKS_ASYNC_MINION_FULL_IMAGE_NAME);
 
    public static final int MICROCKS_ASYNC_MINION_HTTP_PORT = 8081;
+
+   private String extraProtocols = "";
+
 
    /**
     * Build a new MicrocksAsyncMinionContainer with its container image name as string. This image must
@@ -64,6 +69,20 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
    }
 
    /**
+    * Connect the MicrocksAsyncMinionContainer to a Kafka server to allow Kafka messages mocking.
+    * @param connection Connection details to a Kafka broker.
+    * @return self
+    */
+   public MicrocksAsyncMinionContainer withKafkaConnection(KafkaConnection connection) {
+      if (extraProtocols.indexOf(",KAFKA") == -1) {
+         extraProtocols += ",KAFKA";
+      }
+      withEnv("ASYNC_PROTOCOLS", extraProtocols);
+      withEnv("KAFKA_BOOTSTRAP_SERVER", connection.getBootstrapServers());
+      return this;
+   }
+
+   /**
     * Get the Http endpoint where Microcks can be accessed (you'd have to append '/api' to access APIs)
     * @return The Http endpoint for talking to container.
     */
@@ -73,7 +92,7 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
 
    /**
     * Get the exposed mock endpoints for a WebSocket Service.
-    * @param service THe name of Service/API
+    * @param service The name of Service/API
     * @param version The version of Service/API
     * @param operationName The name of operation to get the endpoint for
     * @return A usable endpoint to interact with Microcks mocks.
@@ -87,5 +106,23 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
             service.replace(" ", "+"),
             version.replace(" ", "+"),
             operationName);
+   }
+
+   /**
+    * Get the exposed mock topic for a Kafka Service.
+    * @param service The name of Service/API
+    * @param version The version of Service/API
+    * @param operationName The name of operation to get the topic for
+    * @return A usable topic to interact with Microcks mocks.
+    */
+   public String getKafkaMockTopic(String service, String version, String operationName) {
+      // operationName may start with SUBSCRIBE or PUBLISH.
+      if (operationName.indexOf(" ") != -1) {
+         operationName = operationName.split(" ")[1];
+      }
+      return String.format("%s-%s-%s",
+            service.replace(" ", "").replace("-", ""),
+            version,
+            operationName.replace("/", "-"));
    }
 }

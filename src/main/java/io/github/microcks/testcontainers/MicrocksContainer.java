@@ -211,9 +211,9 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    }
 
    /**
-    *
-    * @param testRequest
-    * @return
+    * Launch a conformance test on an endpoint asynchronously.
+    * @param testRequest The test specifications (API under test, endpoint, runner, ...)
+    * @return A completable future that will allow to retrieve a TestResult once test is finished.
     */
    public CompletableFuture<TestResult> testEndpointAsync(TestRequest testRequest) {
       return CompletableFuture.supplyAsync(() -> {

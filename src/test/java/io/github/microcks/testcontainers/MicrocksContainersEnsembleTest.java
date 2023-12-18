@@ -15,6 +15,7 @@
  */
 package io.github.microcks.testcontainers;
 
+import io.github.microcks.testcontainers.connection.KafkaConnection;
 import io.github.microcks.testcontainers.model.TestRequest;
 import io.github.microcks.testcontainers.model.TestResult;
 import io.github.microcks.testcontainers.model.TestRunnerType;
@@ -22,12 +23,20 @@ import io.github.microcks.testcontainers.model.TestStepResult;
 
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.Producer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.drafts.Draft_6455;
 import org.java_websocket.handshake.ServerHandshake;
 import org.junit.Test;
+import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.redpanda.RedpandaContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.io.File;
@@ -35,6 +44,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -110,6 +120,27 @@ public class MicrocksContainersEnsembleTest {
    }
 
    @Test
+   public void testAsyncFeatureKafkaMockingFunctionality() throws Exception {
+      try (
+            MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble("quay.io/microcks/microcks-uber:nightly")
+                  .withMainArtifacts("pastry-orders-asyncapi.yml")
+                  .withAsyncFeature()
+                  .withKafkaConnection(new KafkaConnection("redpanda:19092"));
+
+            RedpandaContainer redpanda = new RedpandaContainer(DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v23.1.7"))
+                  .withNetwork(ensemble.getNetwork())
+                  .withNetworkAliases("redpanda")
+                  .withListener(() -> "redpanda:19092");
+      ) {
+         redpanda.start();
+         ensemble.start();
+         testMicrocksConfigRetrieval(ensemble.getMicrocksContainer().getHttpEndpoint());
+
+         testMicrocksAsyncKafkaMockingFunctionality(ensemble);
+      }
+   }
+
+   @Test
    public void testAsyncFeatureTestingFunctionality() throws Exception {
       try (
             MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble("quay.io/microcks/microcks-uber:nightly")
@@ -131,6 +162,27 @@ public class MicrocksContainersEnsembleTest {
          testMicrocksConfigRetrieval(ensemble.getMicrocksContainer().getHttpEndpoint());
 
          testMicrocksAsyncContractTestingFunctionality(ensemble);
+      }
+   }
+
+   @Test
+   public void testAsyncFeatureKafkaTestingFunctionality() throws Exception {
+      try (
+            MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble("quay.io/microcks/microcks-uber:nightly")
+                  .withMainArtifacts("pastry-orders-asyncapi.yml")
+                  .withAsyncFeature();
+
+            RedpandaContainer redpanda = new RedpandaContainer(DockerImageName.parse("docker.redpanda.com/redpandadata/redpanda:v23.1.7"))
+                  .withNetwork(ensemble.getNetwork())
+                  .withNetworkAliases("redpanda")
+                  .withListener(() -> "redpanda:19092");
+      ) {
+         redpanda.start();
+         ensemble.start();
+         //ensemble.getAsyncMinionContainer().followOutput(new Slf4jLogConsumer(LoggerFactory.getLogger("MINION")));
+         testMicrocksConfigRetrieval(ensemble.getMicrocksContainer().getHttpEndpoint());
+
+         testMicrocksAsyncKafkaContractTestingFunctionality(ensemble, redpanda);
       }
    }
 
@@ -238,8 +290,7 @@ public class MicrocksContainersEnsembleTest {
          wsClient.connect();
 
          // Wait 7 seconds for messages from Async Minion WebSocket to get at least 2 messages.
-         await()
-               .pollDelay(7, TimeUnit.SECONDS)
+         await().pollDelay(7, TimeUnit.SECONDS)
                .untilAsserted(() -> assertTrue(true));
       } catch (URISyntaxException ex) {
          fail("URISyntaxException exception: " + ex.getMessage());
@@ -251,8 +302,36 @@ public class MicrocksContainersEnsembleTest {
       }
    }
 
-   private void testMicrocksAsyncContractTestingFunctionality(MicrocksContainersEnsemble ensemble) throws Exception {
+   private void testMicrocksAsyncKafkaMockingFunctionality(MicrocksContainersEnsemble ensemble) {
+      // PastryordersAPI-0.1.0-pastry-orders
+      String kafkaTopic = ensemble.getAsyncMinionContainer().getKafkaMockTopic("Pastry orders API", "0.1.0", "SUBSCRIBE pastry/orders");
+      String expectedMessage = "{\"id\":\"4dab240d-7847-4e25-8ef3-1530687650c8\",\"customerId\":\"fe1088b3-9f30-4dc1-a93d-7b74f0a072b9\",\"status\":\"VALIDATED\",\"productQuantities\":[{\"quantity\":2,\"pastryName\":\"Croissant\"},{\"quantity\":1,\"pastryName\":\"Millefeuille\"}]}";
 
+      String message = null;
+      GenericContainer<?> kcat = null;
+      try {
+         kcat = new GenericContainer<>("confluentinc/cp-kcat:7.4.1")
+               .withCreateContainerCmdModifier(cmd -> {cmd.withEntrypoint("sh");})
+               .withNetwork(ensemble.getNetwork())
+               .withCommand("-c", "tail -f /dev/null");
+         kcat.start();
+
+         // Consume exactly one message using kcat.
+         message = kcat.execInContainer("kcat", "-b", "redpanda:19092", "-C", "-t", kafkaTopic, "-c", "1").getStdout();
+      } catch (Exception e) {
+         fail("Exception while connecting to Kafka broker", e);
+      } finally {
+         if (kcat != null) {
+            kcat.stop();
+         }
+      }
+
+      // Compare messages removing carriage return from stdout.
+      assertTrue(message.length() > 1);
+      assertEquals(expectedMessage, message.substring(0, message.length() - 1));
+   }
+
+   private void testMicrocksAsyncContractTestingFunctionality(MicrocksContainersEnsemble ensemble) throws Exception {
       // Produce a new test request.
       TestRequest testRequest = new TestRequest();
       testRequest.setServiceId("Pastry orders API:0.1.0");
@@ -313,6 +392,124 @@ public class MicrocksContainersEnsembleTest {
 
       assertTrue(testResult.isSuccess());
       assertEquals("ws://good-impl:4002/websocket", testResult.getTestedEndpoint());
+
+      // Ensure we had at least grab one message.
+      assertFalse(testResult.getTestCaseResults().get(0).getTestStepResults().isEmpty());
+      assertNull(testResult.getTestCaseResults().get(0).getTestStepResults().get(0).getMessage());
+   }
+
+   private void testMicrocksAsyncKafkaContractTestingFunctionality(MicrocksContainersEnsemble ensemble, RedpandaContainer redpanda) throws Exception {
+      // Bad message has no status, good message has one.
+      String badMessage = "{\"id\":\"abcd\",\"customerId\":\"efgh\",\"productQuantities\":[{\"quantity\":2,\"pastryName\":\"Croissant\"},{\"quantity\":1,\"pastryName\":\"Millefeuille\"}]}";
+      String goodMessage = "{\"id\":\"abcd\",\"customerId\":\"efgh\",\"status\":\"CREATED\",\"productQuantities\":[{\"quantity\":2,\"pastryName\":\"Croissant\"},{\"quantity\":1,\"pastryName\":\"Millefeuille\"}]}";
+
+      // Produce a new test request.
+      TestRequest testRequest = new TestRequest();
+      testRequest.setServiceId("Pastry orders API:0.1.0");
+      testRequest.setRunnerType(TestRunnerType.ASYNC_API_SCHEMA.name());
+      testRequest.setTestEndpoint("kafka://redpanda:19092/pastry-orders"); //?startOffset=0");
+      testRequest.setTimeout(5000l);
+
+      // First test should fail with validation failure messages.
+      CompletableFuture<TestResult> testResultFuture = ensemble.getMicrocksContainer().testEndpointAsync(testRequest);
+
+      try {
+         // Wait 200 ms for test to be fired.
+         await().pollDelay(200, TimeUnit.MILLISECONDS)
+               .untilAsserted(() -> assertTrue(true));
+
+         // Initialize Kafka producer and send 4 messages.
+         Properties props = new Properties();
+         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, redpanda.getBootstrapServers().replace("PLAINTEXT://", ""));
+         props.put(ProducerConfig.CLIENT_ID_CONFIG, "random-" + System.currentTimeMillis());
+         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+         try (final Producer<String, String> producer = new KafkaProducer<>(props)) {
+            for (int i=0; i<5; i++) {
+               ProducerRecord<String, String> record = new ProducerRecord<>("pastry-orders",
+                     String.valueOf(System.currentTimeMillis()), badMessage);
+               System.err.println("Sending bad message " + i + " on Kafka broker");
+               producer.send(record);
+               producer.flush();
+               await().pollDelay(1000, TimeUnit.MILLISECONDS)
+                     .untilAsserted(() -> assertTrue(true));
+            }
+         }
+      } catch (Exception e) {
+         fail("Exception while connecting to Kafka broker", e);
+      }
+
+      TestResult testResult = null;
+      try {
+         testResult = testResultFuture.get();
+      } catch (Exception e) {
+         fail("Got an exception while waiting for test completion", e);
+      }
+
+      /*
+      ObjectMapper mapper = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
+      System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(testResult));
+      */
+
+      assertFalse(testResult.isSuccess());
+      assertEquals("kafka://redpanda:19092/pastry-orders", testResult.getTestedEndpoint());
+
+      // Ensure we had at least grab one message.
+      assertFalse(testResult.getTestCaseResults().get(0).getTestStepResults().isEmpty());
+      TestStepResult testStepResult = testResult.getTestCaseResults().get(0).getTestStepResults().get(0);
+      assertTrue(testStepResult.getMessage().contains("object has missing required properties ([\"status\"]"));
+
+      // Switch endpoint to the correct implementation.
+      // Other way of doing things via builder and fluent api.
+      TestRequest otherTestRequestDTO = new TestRequest.Builder()
+            .serviceId("Pastry orders API:0.1.0")
+            .runnerType(TestRunnerType.ASYNC_API_SCHEMA.name())
+            .testEndpoint("kafka://redpanda:19092/pastry-orders")
+            .timeout(6000L)
+            .build();
+
+      // Second test should succeed without validation failure messages.
+      testResultFuture = ensemble.getMicrocksContainer().testEndpointAsync(otherTestRequestDTO);
+
+      try {
+         // Wait 200 ms for test to be fired.
+         await().pollDelay(200, TimeUnit.MILLISECONDS)
+               .untilAsserted(() -> assertTrue(true));
+
+         // Initialize Kafka producer and send 4 messages.
+         Properties props = new Properties();
+         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, redpanda.getBootstrapServers().replace("PLAINTEXT://", ""));
+         props.put(ProducerConfig.CLIENT_ID_CONFIG, "random-" + System.currentTimeMillis());
+         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+         try (final Producer<String, String> producer = new KafkaProducer<>(props)) {
+            for (int i=0; i<5; i++) {
+               ProducerRecord<String, String> record = new ProducerRecord<>("pastry-orders",
+                     String.valueOf(System.currentTimeMillis()), goodMessage);
+               System.err.println("Sending good message " + i + " on Kafka broker");
+               producer.send(record);
+               producer.flush();
+               await().pollDelay(1000, TimeUnit.MILLISECONDS)
+                     .untilAsserted(() -> assertTrue(true));
+            }
+         }
+      } catch (Exception e) {
+         fail("Exception while connecting to Kafka broker", e);
+      }
+
+      try {
+         testResult = testResultFuture.get();
+      } catch (Exception e) {
+         fail("Got an exception while waiting for test completion", e);
+      }
+
+      /*
+      mapper = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
+      System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(testResult));
+      */
+
+      assertTrue(testResult.isSuccess());
+      assertEquals("kafka://redpanda:19092/pastry-orders", testResult.getTestedEndpoint());
 
       // Ensure we had at least grab one message.
       assertFalse(testResult.getTestCaseResults().get(0).getTestStepResults().isEmpty());
