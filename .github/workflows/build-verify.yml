@@ -14,7 +14,7 @@ on:
 
 jobs:
   build-verify-package:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-4-cores
     environment: Build
     steps:
       - name: Checkout Code
