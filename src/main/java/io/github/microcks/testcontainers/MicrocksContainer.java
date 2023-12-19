@@ -266,7 +266,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          final String testResultId = testResult.getId();
          try {
             Awaitility.await()
-                  .atMost(testRequest.getTimeout() + 500, TimeUnit.MILLISECONDS)
+                  .atMost(testRequest.getTimeout() + 1000, TimeUnit.MILLISECONDS)
                   .pollDelay(100, TimeUnit.MILLISECONDS)
                   .pollInterval(200, TimeUnit.MILLISECONDS)
                   .until(() -> !refreshTestResult(microcksContainerHttpEndpoint, testResultId).isInProgress());
