@@ -16,6 +16,7 @@
 package io.github.microcks.testcontainers;
 
 import io.github.microcks.testcontainers.connection.KafkaConnection;
+import io.github.microcks.testcontainers.model.Secret;
 
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
@@ -150,6 +151,16 @@ public class MicrocksContainersEnsemble implements Startable {
     */
    public MicrocksContainersEnsemble withSecondaryArtifacts(String... artifacts) {
       microcks.withSecondaryArtifacts(artifacts);
+      return this;
+   }
+
+   /**
+    * Provide Secret that should be imported in Microcks after startup.
+    * @param secret The description of a secret to access remote Git repotisory, test endpoint or broker.
+    * @return self
+    */
+   public MicrocksContainersEnsemble withSecret(Secret secret) {
+      microcks.withSecret(secret);
       return this;
    }
 
