@@ -23,10 +23,16 @@ import io.github.microcks.testcontainers.model.TestStepResult;
 
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
+import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRebalanceListener;
+import org.apache.kafka.clients.consumer.ConsumerRecords;
+import org.apache.kafka.clients.consumer.KafkaConsumer;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.TopicPartition;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.drafts.Draft_6455;
@@ -42,7 +48,10 @@ import org.testcontainers.utility.DockerImageName;
 import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
@@ -136,7 +145,7 @@ public class MicrocksContainersEnsembleTest {
          ensemble.start();
          testMicrocksConfigRetrieval(ensemble.getMicrocksContainer().getHttpEndpoint());
 
-         testMicrocksAsyncKafkaMockingFunctionality(ensemble);
+         testMicrocksAsyncKafkaMockingFunctionality(ensemble, redpanda);
       }
    }
 
@@ -302,33 +311,51 @@ public class MicrocksContainersEnsembleTest {
       }
    }
 
-   private void testMicrocksAsyncKafkaMockingFunctionality(MicrocksContainersEnsemble ensemble) {
+   private void testMicrocksAsyncKafkaMockingFunctionality(MicrocksContainersEnsemble ensemble, RedpandaContainer redpanda) {
       // PastryordersAPI-0.1.0-pastry-orders
       String kafkaTopic = ensemble.getAsyncMinionContainer().getKafkaMockTopic("Pastry orders API", "0.1.0", "SUBSCRIBE pastry/orders");
       String expectedMessage = "{\"id\":\"4dab240d-7847-4e25-8ef3-1530687650c8\",\"customerId\":\"fe1088b3-9f30-4dc1-a93d-7b74f0a072b9\",\"status\":\"VALIDATED\",\"productQuantities\":[{\"quantity\":2,\"pastryName\":\"Croissant\"},{\"quantity\":1,\"pastryName\":\"Millefeuille\"}]}";
 
-      String message = null;
-      GenericContainer<?> kcat = null;
-      try {
-         kcat = new GenericContainer<>("confluentinc/cp-kcat:7.4.1")
-               .withCreateContainerCmdModifier(cmd -> {cmd.withEntrypoint("sh");})
-               .withNetwork(ensemble.getNetwork())
-               .withCommand("-c", "tail -f /dev/null");
-         kcat.start();
+      // Initialize Kafka producer to receive 1 message.
+      Properties props = new Properties();
+      props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, redpanda.getBootstrapServers().replace("PLAINTEXT://", ""));
+      props.put(ConsumerConfig.GROUP_ID_CONFIG, "random-" + System.currentTimeMillis());
+      props.put(ConsumerConfig.CLIENT_ID_CONFIG, "random-" + System.currentTimeMillis());
+      props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
+      props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class.getName());
 
-         // Consume exactly one message using kcat.
-         message = kcat.execInContainer("kcat", "-b", "redpanda:19092", "-C", "-t", kafkaTopic, "-c", "1").getStdout();
+      // Only retrieve incoming messages and do not persist offset.
+      props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "latest");
+      props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
+      KafkaConsumer consumer = new KafkaConsumer<>(props);
+      String message = null;
+
+      try {
+         // Subscribe Kafka consumer and receive 1 message.
+         consumer.subscribe(Arrays.asList(kafkaTopic), new ConsumerRebalanceListener() {
+            @Override
+            public void onPartitionsRevoked(Collection<TopicPartition> partitions) {
+            }
+            @Override
+            public void onPartitionsAssigned(Collection<TopicPartition> partitions) {
+               partitions.forEach(p -> consumer.seek(p, 0));
+            }
+         });
+         ConsumerRecords<String, String> records = consumer.poll(Duration.ofMillis(4000));
+         if (!records.isEmpty()) {
+            message = records.iterator().next().value();
+         }
+
       } catch (Exception e) {
          fail("Exception while connecting to Kafka broker", e);
       } finally {
-         if (kcat != null) {
-            kcat.stop();
-         }
+         consumer.close();
       }
 
       // Compare messages removing carriage return from stdout.
+      assertNotNull(message);
       assertTrue(message.length() > 1);
-      assertEquals(expectedMessage, message.substring(0, message.length() - 1));
+      assertEquals(expectedMessage, message);
    }
 
    private void testMicrocksAsyncContractTestingFunctionality(MicrocksContainersEnsemble ensemble) throws Exception {
@@ -413,17 +440,15 @@ public class MicrocksContainersEnsembleTest {
       // First test should fail with validation failure messages.
       CompletableFuture<TestResult> testResultFuture = ensemble.getMicrocksContainer().testEndpointAsync(testRequest);
 
-      try {
-         // Wait 200 ms for test to be fired.
-         await().pollDelay(200, TimeUnit.MILLISECONDS)
-               .untilAsserted(() -> assertTrue(true));
+      // Initialize Kafka producer and send 4 messages.
+      Properties props = new Properties();
+      props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, redpanda.getBootstrapServers().replace("PLAINTEXT://", ""));
+      props.put(ProducerConfig.CLIENT_ID_CONFIG, "random-" + System.currentTimeMillis());
+      props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+      props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
 
-         // Initialize Kafka producer and send 4 messages.
-         Properties props = new Properties();
-         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, redpanda.getBootstrapServers().replace("PLAINTEXT://", ""));
-         props.put(ProducerConfig.CLIENT_ID_CONFIG, "random-" + System.currentTimeMillis());
-         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+      try {
+         // Send 4 messages on Kafka.
          try (final Producer<String, String> producer = new KafkaProducer<>(props)) {
             for (int i=0; i<5; i++) {
                ProducerRecord<String, String> record = new ProducerRecord<>("pastry-orders",
@@ -472,16 +497,7 @@ public class MicrocksContainersEnsembleTest {
       testResultFuture = ensemble.getMicrocksContainer().testEndpointAsync(otherTestRequestDTO);
 
       try {
-         // Wait 200 ms for test to be fired.
-         await().pollDelay(200, TimeUnit.MILLISECONDS)
-               .untilAsserted(() -> assertTrue(true));
-
-         // Initialize Kafka producer and send 4 messages.
-         Properties props = new Properties();
-         props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, redpanda.getBootstrapServers().replace("PLAINTEXT://", ""));
-         props.put(ProducerConfig.CLIENT_ID_CONFIG, "random-" + System.currentTimeMillis());
-         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
-         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
+         // Send 4 messages on Kafka.
          try (final Producer<String, String> producer = new KafkaProducer<>(props)) {
             for (int i=0; i<5; i++) {
                ProducerRecord<String, String> record = new ProducerRecord<>("pastry-orders",
