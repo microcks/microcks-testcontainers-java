@@ -166,6 +166,7 @@ public class MicrocksContainersEnsembleTest {
                   .waitingFor(Wait.forLogMessage(".*Starting WebSocket server on ws://localhost:4002/websocket.*", 1));
       ) {
          ensemble.start();
+         ensemble.getAsyncMinionContainer().followOutput(new Slf4jLogConsumer(LoggerFactory.getLogger("MINION")));
          badImpl.start();
          goodImpl.start();
          testMicrocksConfigRetrieval(ensemble.getMicrocksContainer().getHttpEndpoint());
@@ -188,7 +189,7 @@ public class MicrocksContainersEnsembleTest {
       ) {
          redpanda.start();
          ensemble.start();
-         //ensemble.getAsyncMinionContainer().followOutput(new Slf4jLogConsumer(LoggerFactory.getLogger("MINION")));
+         ensemble.getAsyncMinionContainer().followOutput(new Slf4jLogConsumer(LoggerFactory.getLogger("MINION")));
          testMicrocksConfigRetrieval(ensemble.getMicrocksContainer().getHttpEndpoint());
 
          testMicrocksAsyncKafkaContractTestingFunctionality(ensemble, redpanda);
