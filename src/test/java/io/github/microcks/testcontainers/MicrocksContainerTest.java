@@ -16,6 +16,7 @@
 package io.github.microcks.testcontainers;
 
 import io.github.microcks.testcontainers.model.Header;
+import io.github.microcks.testcontainers.model.Secret;
 import io.github.microcks.testcontainers.model.TestRequest;
 import io.github.microcks.testcontainers.model.TestResult;
 import io.github.microcks.testcontainers.model.TestRunnerType;
@@ -88,6 +89,26 @@ public class MicrocksContainerTest {
 
          microcks.importAsMainArtifact(new File("target/test-classes/apipastries-openapi.yaml"));
          testMicrocksContractTestingFunctionality(microcks, badImpl, goodImpl);
+      }
+   }
+
+   @Test
+   public void testSecretCreation() throws Exception {
+      try (
+            MicrocksContainer microcks = new MicrocksContainer(IMAGE)
+                  .withSecret(new Secret.Builder().name("my-secret").token("abc-123-xyz").build());
+      ) {
+         microcks.start();
+         testMicrocksConfigRetrieval(microcks.getHttpEndpoint());
+
+         Response secrets = RestAssured.given().when()
+               .get(microcks.getHttpEndpoint() + "/api/secrets")
+               .thenReturn();
+
+         assertEquals(200, secrets.getStatusCode());
+         assertEquals(1, secrets.jsonPath().getList(".").size());
+         assertEquals("my-secret", secrets.jsonPath().get("[0].name"));
+         assertEquals("abc-123-xyz", secrets.jsonPath().get("[0].token"));
       }
    }
 

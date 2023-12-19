@@ -15,6 +15,7 @@
  */
 package io.github.microcks.testcontainers;
 
+import io.github.microcks.testcontainers.model.Secret;
 import io.github.microcks.testcontainers.model.TestResult;
 import io.github.microcks.testcontainers.model.TestRequest;
 
@@ -25,6 +26,8 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
+import org.testcontainers.shaded.com.github.dockerjava.core.MediaType;
+import org.testcontainers.shaded.com.google.common.net.HttpHeaders;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 import org.testcontainers.shaded.org.awaitility.core.ConditionTimeoutException;
 import org.testcontainers.utility.DockerImageName;
@@ -68,6 +71,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
 
    private Set<String> mainArtifactsToImport;
    private Set<String> secondaryArtifactsToImport;
+   private Set<Secret> secrets;
 
    /**
     * Build a new MicrocksContainer with its container image name as string. This image must
@@ -120,6 +124,19 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       return self();
    }
 
+   /**
+    * Provide Secret that should be imported in Microcks after startup.
+    * @param secret The description of a secret to access remote Git repotisory, test endpoint or broker.
+    * @return self
+    */
+   public MicrocksContainer withSecret(Secret secret) {
+      if (secrets == null) {
+         secrets = new HashSet<>();
+      }
+      secrets.add(secret);
+      return self();
+   }
+
    @Override
    protected void containerIsStarted(InspectContainerResponse containerInfo) {
       if (mainArtifactsToImport != null && !mainArtifactsToImport.isEmpty()) {
@@ -127,6 +144,9 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       }
       if (secondaryArtifactsToImport != null && !secondaryArtifactsToImport.isEmpty()) {
          secondaryArtifactsToImport.stream().forEach((String artifactPath) -> this.importArtifact(artifactPath, false));
+      }
+      if (secrets != null && !secrets.isEmpty()) {
+         secrets.stream().forEach((Secret secret) -> this.createSecret(secret));
       }
    }
 
@@ -241,7 +261,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       URL url = new URL(microcksContainerHttpEndpoint + "/api/tests");
       HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
       httpConn.setRequestMethod("POST");
-      httpConn.setRequestProperty("Content-Type", "application/json");
+      httpConn.setRequestProperty(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON.getMediaType());
       httpConn.setDoOutput(true);
 
       try (OutputStream os = httpConn.getOutputStream()) {
@@ -357,11 +377,51 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          // Disconnect Http connection.
          httpConn.disconnect();
 
-         log.error("Artifact has not been correctly been imported: {}", responseContent);
-         throw new MicrocksException("Artifact has not been correctly been imported: " + responseContent);
+         log.error("Artifact has not been correctly imported: {}", responseContent);
+         throw new MicrocksException("Artifact has not been correctly imported: " + responseContent);
       }
       // Disconnect Http connection.
       httpConn.disconnect();
+   }
+
+   private void createSecret(Secret secret) {
+      try {
+         URL url = new URL(getHttpEndpoint() + "/api/secrets");
+         HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
+         httpConn.setRequestMethod("POST");
+         httpConn.setRequestProperty(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON.getMediaType());
+         httpConn.setRequestProperty(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON.getMediaType());
+         httpConn.setDoOutput(true);
+
+         String requestBody = getMapper().writeValueAsString(secret);
+
+         try (OutputStream os = httpConn.getOutputStream()) {
+            byte[] input = requestBody.getBytes(StandardCharsets.UTF_8);
+            os.write(input, 0, input.length);
+            os.flush();
+         }
+
+         if (httpConn.getResponseCode() != 201) {
+            // Read response content for diagnostic purpose.
+            StringBuilder responseContent = new StringBuilder();
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(httpConn.getInputStream(), StandardCharsets.UTF_8))) {
+               String responseLine = null;
+               while ((responseLine = br.readLine()) != null) {
+                  responseContent.append(responseLine.trim());
+               }
+            }
+            // Disconnect Http connection.
+            httpConn.disconnect();
+
+            log.error("Secret has not been correctly created: {}", responseContent);
+            throw new MicrocksException("Secret has not been correctly created: " + responseContent);
+         }
+         // Disconnect Http connection.
+         httpConn.disconnect();
+      } catch (Exception e) {
+         log.warn("Error while creating Secret: {}", secret.getName());
+         throw new SecretCreationException("Error while creating Secret", e);
+      }
    }
 
    private static ObjectMapper getMapper() {
@@ -402,6 +462,16 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          super(message);
       }
       public ArtifactLoadException(String message, Throwable cause) {
+         super(message, cause);
+      }
+   }
+
+   public static class SecretCreationException extends RuntimeException {
+
+      public SecretCreationException(String message) {
+         super(message);
+      }
+      public SecretCreationException(String message, Throwable cause) {
          super(message, cause);
       }
    }
