@@ -15,6 +15,7 @@
  */
 package io.github.microcks.testcontainers;
 
+import io.github.microcks.testcontainers.connection.AmazonServiceConnection;
 import io.github.microcks.testcontainers.connection.KafkaConnection;
 import io.github.microcks.testcontainers.model.TestRequest;
 import io.github.microcks.testcontainers.model.TestResult;
@@ -40,10 +41,20 @@ import org.java_websocket.handshake.ServerHandshake;
 import org.junit.Test;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
+import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.redpanda.RedpandaContainer;
 import org.testcontainers.utility.DockerImageName;
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
+import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.sqs.SqsClient;
+import software.amazon.awssdk.services.sqs.model.ListQueuesRequest;
+import software.amazon.awssdk.services.sqs.model.ListQueuesResponse;
+import software.amazon.awssdk.services.sqs.model.Message;
+import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 
 import java.io.File;
 import java.net.URI;
@@ -146,6 +157,36 @@ public class MicrocksContainersEnsembleTest {
          testMicrocksConfigRetrieval(ensemble.getMicrocksContainer().getHttpEndpoint());
 
          testMicrocksAsyncKafkaMockingFunctionality(ensemble, redpanda);
+      }
+   }
+
+   @Test
+   public void testAsyncFeatureAmazonSQSMockingFunctionality() throws Exception {
+      Network network = null;
+      LocalStackContainer localstack = null;
+      MicrocksContainersEnsemble ensemble = null;
+      try {
+         network = Network.newNetwork();
+         localstack = new LocalStackContainer(DockerImageName.parse("localstack/localstack:latest"))
+               .withNetwork(network)
+               .withNetworkAliases("localstack")
+               .withServices(LocalStackContainer.Service.SQS);
+         localstack.start();
+
+         ensemble =  new MicrocksContainersEnsemble(network, "quay.io/microcks/microcks-uber:nightly")
+               .withMainArtifacts("pastry-orders-asyncapi.yml")
+               .withAsyncFeature()
+               .withAmazonSQSConnection(new AmazonServiceConnection(localstack.getRegion(),
+                     localstack.getAccessKey(),
+                     localstack.getSecretKey(),
+                     "http://localstack:" + localstack.getExposedPorts().get(0)));
+         ensemble.start();
+         testMicrocksConfigRetrieval(ensemble.getMicrocksContainer().getHttpEndpoint());
+
+         testMicrocksAsyncAmazonSQSMockingFunctionality(ensemble, localstack);
+      } finally {
+         localstack.stop();
+         ensemble.stop();
       }
    }
 
@@ -353,12 +394,67 @@ public class MicrocksContainersEnsembleTest {
          consumer.close();
       }
 
-      // Compare messages removing carriage return from stdout.
+      // Compare messages.
       assertNotNull(message);
       assertTrue(message.length() > 1);
       assertEquals(expectedMessage, message);
    }
 
+   private void testMicrocksAsyncAmazonSQSMockingFunctionality(MicrocksContainersEnsemble ensemble, LocalStackContainer localstack) {
+      // PastryordersAPI-010-pastry-orders
+      String sqsQueue = ensemble.getAsyncMinionContainer().getAmazonSQSMockQueue("Pastry orders API", "0.1.0", "SUBSCRIBE pastry/orders");
+      String expectedMessage = "{\"id\":\"4dab240d-7847-4e25-8ef3-1530687650c8\",\"customerId\":\"fe1088b3-9f30-4dc1-a93d-7b74f0a072b9\",\"status\":\"VALIDATED\",\"productQuantities\":[{\"quantity\":2,\"pastryName\":\"Croissant\"},{\"quantity\":1,\"pastryName\":\"Millefeuille\"}]}";
+
+      SqsClient sqsClient = null;
+      List<String> messages = new ArrayList<>();
+      try {
+         sqsClient = SqsClient.builder()
+               .endpointOverride(localstack.getEndpoint())
+               .region(Region.of(localstack.getRegion()))
+               .credentialsProvider(StaticCredentialsProvider.create(
+                     AwsBasicCredentials.create(localstack.getAccessKey(), localstack.getSecretKey())
+               ))
+               .build();
+
+         // Wait a moment to be sure that minion has created the SQS queue.
+         await().pollDelay(1500, TimeUnit.MILLISECONDS)
+               .untilAsserted(() -> assertTrue(true));
+
+         // Retrieve this queue URL
+         ListQueuesRequest listRequest = ListQueuesRequest.builder()
+               .queueNamePrefix(sqsQueue).maxResults(1).build();
+         ListQueuesResponse listResponse = sqsClient.listQueues(listRequest);
+         String queueUrl = listResponse.queueUrls().get(0);
+
+         // Now consumer the mock messages for 4 seconds.
+         long startTime = System.currentTimeMillis();
+         long timeoutTime = startTime + 4000;
+         while (System.currentTimeMillis() - startTime < 4000) {
+            // Start polling/receiving messages with a max wait time and a max number.
+            ReceiveMessageRequest messageRequest = ReceiveMessageRequest.builder()
+                  .queueUrl(queueUrl)
+                  .maxNumberOfMessages(10)
+                  .waitTimeSeconds((int) (timeoutTime - System.currentTimeMillis()) / 1000)
+                  .build();
+
+            List<Message> receivedMessages = sqsClient.receiveMessage(messageRequest).messages();
+
+            for (Message receivedMessage : receivedMessages) {
+               messages.add(receivedMessage.body());
+            }
+         }
+      } catch (Exception e) {
+         fail("Exception while connecting to Localstack SQS queue", e);
+      } finally {
+         sqsClient.close();
+      }
+
+      // Check consumed messages.
+      assertFalse(messages.isEmpty());
+      for (String message : messages) {
+         assertEquals(expectedMessage, message);
+      }
+   }
    private void testMicrocksAsyncContractTestingFunctionality(MicrocksContainersEnsemble ensemble) throws Exception {
       // Produce a new test request.
       TestRequest testRequest = new TestRequest();
