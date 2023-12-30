@@ -131,6 +131,19 @@ public class MicrocksContainersEnsemble implements Startable {
    }
 
    /**
+    * Once the Async Feature is enabled, connects to an Amazon SNS service.
+    * @param connection Connection details to an Amazon SNS service.
+    * @return self
+    */
+   public MicrocksContainersEnsemble withAmazonSNSConnection(AmazonServiceConnection connection) {
+      if (this.asyncMinion == null) {
+         throw new IllegalStateException("Async feature must have been enabled first");
+      }
+      this.asyncMinion.withAmazonSNSConnection(connection);
+      return this;
+   }
+
+   /**
     * Set host accessibility on ensemble containers.
     * @param hostAccessible Host accessibility flag
     * @return The ensemble being built

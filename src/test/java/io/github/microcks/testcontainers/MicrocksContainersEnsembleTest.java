@@ -17,6 +17,7 @@ package io.github.microcks.testcontainers;
 
 import io.github.microcks.testcontainers.connection.AmazonServiceConnection;
 import io.github.microcks.testcontainers.connection.KafkaConnection;
+import io.github.microcks.testcontainers.model.Secret;
 import io.github.microcks.testcontainers.model.TestRequest;
 import io.github.microcks.testcontainers.model.TestResult;
 import io.github.microcks.testcontainers.model.TestRunnerType;
@@ -51,6 +52,7 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sqs.SqsClient;
+import software.amazon.awssdk.services.sqs.model.CreateQueueRequest;
 import software.amazon.awssdk.services.sqs.model.ListQueuesRequest;
 import software.amazon.awssdk.services.sqs.model.ListQueuesResponse;
 import software.amazon.awssdk.services.sqs.model.Message;
@@ -234,6 +236,37 @@ public class MicrocksContainersEnsembleTest {
          testMicrocksConfigRetrieval(ensemble.getMicrocksContainer().getHttpEndpoint());
 
          testMicrocksAsyncKafkaContractTestingFunctionality(ensemble, redpanda);
+      }
+   }
+
+   @Test
+   public void testAsyncFeatureAmazonSQSTestingFunctionality() throws Exception {
+      Network network = null;
+      LocalStackContainer localstack = null;
+      MicrocksContainersEnsemble ensemble = null;
+      try {
+         network = Network.newNetwork();
+         localstack = new LocalStackContainer(DockerImageName.parse("localstack/localstack:latest"))
+               .withNetwork(network)
+               .withNetworkAliases("localstack")
+               .withServices(LocalStackContainer.Service.SQS);
+         localstack.start();
+
+         ensemble =  new MicrocksContainersEnsemble(network, "quay.io/microcks/microcks-uber:nightly")
+               .withMainArtifacts("pastry-orders-asyncapi.yml")
+               .withAsyncFeature()
+               .withSecret(new Secret.Builder()
+                     .name("localstack secret")
+                     .username(localstack.getAccessKey())
+                     .password(localstack.getSecretKey())
+                     .build());
+         ensemble.start();
+         testMicrocksConfigRetrieval(ensemble.getMicrocksContainer().getHttpEndpoint());
+
+         testMicrocksAsyncAmazonSQSContractTestingFunctionality(ensemble, localstack);
+      } finally {
+         localstack.stop();
+         ensemble.stop();
       }
    }
 
@@ -455,6 +488,7 @@ public class MicrocksContainersEnsembleTest {
          assertEquals(expectedMessage, message);
       }
    }
+
    private void testMicrocksAsyncContractTestingFunctionality(MicrocksContainersEnsemble ensemble) throws Exception {
       // Produce a new test request.
       TestRequest testRequest = new TestRequest();
@@ -623,6 +657,124 @@ public class MicrocksContainersEnsembleTest {
 
       assertTrue(testResult.isSuccess());
       assertEquals("kafka://redpanda:19092/pastry-orders", testResult.getTestedEndpoint());
+
+      // Ensure we had at least grab one message.
+      assertFalse(testResult.getTestCaseResults().get(0).getTestStepResults().isEmpty());
+      assertNull(testResult.getTestCaseResults().get(0).getTestStepResults().get(0).getMessage());
+   }
+
+   private void testMicrocksAsyncAmazonSQSContractTestingFunctionality(MicrocksContainersEnsemble ensemble, LocalStackContainer localstack) throws Exception {
+      // Bad message has no status, good message has one.
+      String badMessage = "{\"id\":\"abcd\",\"customerId\":\"efgh\",\"productQuantities\":[{\"quantity\":2,\"pastryName\":\"Croissant\"},{\"quantity\":1,\"pastryName\":\"Millefeuille\"}]}";
+      String goodMessage = "{\"id\":\"abcd\",\"customerId\":\"efgh\",\"status\":\"CREATED\",\"productQuantities\":[{\"quantity\":2,\"pastryName\":\"Croissant\"},{\"quantity\":1,\"pastryName\":\"Millefeuille\"}]}";
+
+      // Produce a new test request.
+      TestRequest testRequest = new TestRequest();
+      testRequest.setServiceId("Pastry orders API:0.1.0");
+      testRequest.setRunnerType(TestRunnerType.ASYNC_API_SCHEMA.name());
+      testRequest.setTestEndpoint("sqs://" + localstack.getRegion() + "/pastry-orders?overrideUrl=http://localstack:" + localstack.getExposedPorts().get(0));
+      testRequest.setSecretName("localstack secret");
+      testRequest.setTimeout(5000l);
+
+      String queueUrl = null;
+      SqsClient sqsClient = null;
+      CompletableFuture<TestResult> testResultFuture = null;
+      try {
+         sqsClient = SqsClient.builder()
+               .endpointOverride(localstack.getEndpoint())
+               .region(Region.of(localstack.getRegion()))
+               .credentialsProvider(StaticCredentialsProvider.create(
+                     AwsBasicCredentials.create(localstack.getAccessKey(), localstack.getSecretKey())
+               ))
+               .build();
+
+         CreateQueueRequest createQueueRequest = CreateQueueRequest.builder().queueName("pastry-orders").build();
+         queueUrl = sqsClient.createQueue(createQueueRequest).queueUrl();
+
+         // First test should fail with validation failure messages.
+         testResultFuture = ensemble.getMicrocksContainer().testEndpointAsync(testRequest);
+
+         final String finalQueueUrl = queueUrl;
+         for (int i=0; i<5; i++) {
+            sqsClient.sendMessage(mr -> mr.queueUrl(finalQueueUrl)
+                  .messageBody(badMessage)
+                  .build());
+            System.err.println("Sending bad message " + i + " on SQS queue");
+            await().pollDelay(1000, TimeUnit.MILLISECONDS)
+                  .untilAsserted(() -> assertTrue(true));
+         }
+      } catch (Exception e) {
+         sqsClient.close();
+         fail("Exception while connecting to SQS queue", e);
+      }
+
+      TestResult testResult = null;
+      try {
+         testResult = testResultFuture.get();
+      } catch (Exception e) {
+         sqsClient.close();
+         fail("Got an exception while waiting for test completion", e);
+      }
+
+      /*
+      ObjectMapper mapper = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
+      System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(testResult));
+      */
+
+      assertFalse(testResult.isSuccess());
+      assertEquals("sqs://" + localstack.getRegion() + "/pastry-orders?overrideUrl=http://localstack:" + localstack.getExposedPorts().get(0), testResult.getTestedEndpoint());
+
+      // Ensure we had at least grab one message.
+      assertFalse(testResult.getTestCaseResults().get(0).getTestStepResults().isEmpty());
+      TestStepResult testStepResult = testResult.getTestCaseResults().get(0).getTestStepResults().get(0);
+      assertTrue(testStepResult.getMessage().contains("object has missing required properties ([\"status\"]"));
+
+
+      // Switch endpoint to the correct implementation.
+      // Other way of doing things via builder and fluent api.
+      TestRequest otherTestRequestDTO = new TestRequest.Builder()
+            .serviceId("Pastry orders API:0.1.0")
+            .runnerType(TestRunnerType.ASYNC_API_SCHEMA.name())
+            .testEndpoint("sqs://" + localstack.getRegion() + "/pastry-orders?overrideUrl=http://localstack:" + localstack.getExposedPorts().get(0))
+            .secretName("localstack secret")
+            .timeout(5000L)
+            .build();
+
+      testResultFuture = null;
+      try {
+         // First test should fail with validation failure messages.
+         testResultFuture = ensemble.getMicrocksContainer().testEndpointAsync(otherTestRequestDTO);
+
+         final String finalQueueUrl = queueUrl;
+         for (int i=0; i<5; i++) {
+            sqsClient.sendMessage(mr -> mr.queueUrl(finalQueueUrl)
+                  .messageBody(goodMessage)
+                  .build());
+            System.err.println("Sending good message " + i + " on SQS queue");
+            await().pollDelay(1000, TimeUnit.MILLISECONDS)
+                  .untilAsserted(() -> assertTrue(true));
+         }
+      } catch (Exception e) {
+         sqsClient.close();
+         fail("Exception while connecting to SQS queue", e);
+      }
+
+      try {
+         testResult = testResultFuture.get();
+      } catch (Exception e) {
+         sqsClient.close();
+         fail("Got an exception while waiting for test completion", e);
+      }
+      // We no longer need the SQS client.
+      sqsClient.close();
+
+      /*
+      ObjectMapper mapper = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
+      System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(testResult));
+      */
+
+      assertTrue(testResult.isSuccess());
+      assertEquals("sqs://" + localstack.getRegion() + "/pastry-orders?overrideUrl=http://localstack:" + localstack.getExposedPorts().get(0), testResult.getTestedEndpoint());
 
       // Ensure we had at least grab one message.
       assertFalse(testResult.getTestCaseResults().get(0).getTestStepResults().isEmpty());

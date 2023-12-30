@@ -103,6 +103,25 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
    }
 
    /**
+    * Connect the MicrocksAsyncMinionContainer to an Amazon SNS service to allow SNS messages mocking.
+    * @param connection Connection details to an Amazon SNS service.
+    * @return self
+    */
+   public MicrocksAsyncMinionContainer withAmazonSNSConnection(AmazonServiceConnection connection) {
+      if (extraProtocols.indexOf(",SNS") == -1) {
+         extraProtocols += ",SNS";
+      }
+      withEnv("ASYNC_PROTOCOLS", extraProtocols);
+      withEnv("AWS_SNS_REGION", connection.getRegion());
+      withEnv("AWS_ACCESS_KEY_ID", connection.getAccessKey());
+      withEnv("AWS_SECRET_ACCESS_KEY", connection.getSecretKey());
+      if (connection.getEndpointOverride() != null) {
+         withEnv("AWS_SNS_ENDPOINT", connection.getEndpointOverride());
+      }
+      return this;
+   }
+
+   /**
     * Get the Http endpoint where Microcks can be accessed (you'd have to append '/api' to access APIs)
     * @return The Http endpoint for talking to container.
     */
@@ -154,6 +173,21 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
     * @return A usable queue to interact with Microcks mocks.
     */
    public String getAmazonSQSMockQueue(String service, String version, String operationName) {
+      return getAmazonServiceMockDestination(service, version, operationName);
+   }
+
+   /**
+    * Get the exposed mock topic for an Amazon SNS Service.
+    * @param service The name of Service/API
+    * @param version The version of Service/API
+    * @param operationName The name of operation to get the topic for
+    * @return A usable queue to interact with Microcks mocks.
+    */
+   public String getAmazonSNSMockTopic(String service, String version, String operationName) {
+      return getAmazonServiceMockDestination(service, version, operationName);
+   }
+
+   private String getAmazonServiceMockDestination(String service, String version, String operationName) {
       // operationName may start with SUBSCRIBE or PUBLISH.
       if (operationName.indexOf(" ") != -1) {
          operationName = operationName.split(" ")[1];
