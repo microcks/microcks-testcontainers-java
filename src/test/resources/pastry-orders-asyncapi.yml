@@ -13,6 +13,10 @@ channels:
       operationId: receivedPastryOrder
       message:
         $ref: '#/components/messages/PastryOrder'
+      bindings:
+        sqs:
+          queue:
+            name: pastry-orders
     bindings:
       ws:
         method: POST

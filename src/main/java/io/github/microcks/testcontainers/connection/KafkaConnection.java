@@ -24,7 +24,7 @@ public class KafkaConnection {
    private String bootstrapServers;
 
    /**
-    * Create a KafkaConnection
+    * Create a KafkaConnection.
     * @param bootstrapServers The bootstrap servers url for Kafka target.
     */
    public KafkaConnection(String bootstrapServers) {

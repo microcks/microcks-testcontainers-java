@@ -15,6 +15,7 @@
  */
 package io.github.microcks.testcontainers;
 
+import io.github.microcks.testcontainers.connection.AmazonServiceConnection;
 import io.github.microcks.testcontainers.connection.KafkaConnection;
 import io.github.microcks.testcontainers.model.Secret;
 
@@ -104,8 +105,8 @@ public class MicrocksContainersEnsemble implements Startable {
    }
 
    /**
-    *
-    * @param connection
+    * Once the Async Feature is enabled, connects to a Kafka broker.
+    * @param connection Connection details to a Kafka broker.
     * @return self
     */
    public MicrocksContainersEnsemble withKafkaConnection(KafkaConnection connection) {
@@ -113,6 +114,19 @@ public class MicrocksContainersEnsemble implements Startable {
          throw new IllegalStateException("Async feature must have been enabled first");
       }
       this.asyncMinion.withKafkaConnection(connection);
+      return this;
+   }
+
+   /**
+    * Once the Async Feature is enabled, connects to an Amazon SQS service.
+    * @param connection Connection details to an Amazon SQS service.
+    * @return self
+    */
+   public MicrocksContainersEnsemble withAmazonSQSConnection(AmazonServiceConnection connection) {
+      if (this.asyncMinion == null) {
+         throw new IllegalStateException("Async feature must have been enabled first");
+      }
+      this.asyncMinion.withAmazonSQSConnection(connection);
       return this;
    }
 
@@ -156,7 +170,7 @@ public class MicrocksContainersEnsemble implements Startable {
 
    /**
     * Provide Secret that should be imported in Microcks after startup.
-    * @param secret The description of a secret to access remote Git repotisory, test endpoint or broker.
+    * @param secret The description of a secret to access remote Git repository, test endpoint or broker.
     * @return self
     */
    public MicrocksContainersEnsemble withSecret(Secret secret) {

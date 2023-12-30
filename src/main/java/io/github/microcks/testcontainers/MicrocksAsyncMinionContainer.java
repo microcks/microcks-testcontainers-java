@@ -15,6 +15,7 @@
  */
 package io.github.microcks.testcontainers;
 
+import io.github.microcks.testcontainers.connection.AmazonServiceConnection;
 import io.github.microcks.testcontainers.connection.KafkaConnection;
 
 import org.testcontainers.containers.GenericContainer;
@@ -83,6 +84,25 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
    }
 
    /**
+    * Connect the MicrocksAsyncMinionContainer to an Amazon SQS service to allow SQS messages mocking.
+    * @param connection Connection details to an Amazon SQS service.
+    * @return self
+    */
+   public MicrocksAsyncMinionContainer withAmazonSQSConnection(AmazonServiceConnection connection) {
+      if (extraProtocols.indexOf(",SQS") == -1) {
+         extraProtocols += ",SQS";
+      }
+      withEnv("ASYNC_PROTOCOLS", extraProtocols);
+      withEnv("AWS_SQS_REGION", connection.getRegion());
+      withEnv("AWS_ACCESS_KEY_ID", connection.getAccessKey());
+      withEnv("AWS_SECRET_ACCESS_KEY", connection.getSecretKey());
+      if (connection.getEndpointOverride() != null) {
+         withEnv("AWS_SQS_ENDPOINT", connection.getEndpointOverride());
+      }
+      return this;
+   }
+
+   /**
     * Get the Http endpoint where Microcks can be accessed (you'd have to append '/api' to access APIs)
     * @return The Http endpoint for talking to container.
     */
@@ -123,6 +143,24 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
       return String.format("%s-%s-%s",
             service.replace(" ", "").replace("-", ""),
             version,
+            operationName.replace("/", "-"));
+   }
+
+   /**
+    * Get the exposed mock queue for an Amazon SQS Service.
+    * @param service The name of Service/API
+    * @param version The version of Service/API
+    * @param operationName The name of operation to get the topic for
+    * @return A usable queue to interact with Microcks mocks.
+    */
+   public String getAmazonSQSMockQueue(String service, String version, String operationName) {
+      // operationName may start with SUBSCRIBE or PUBLISH.
+      if (operationName.indexOf(" ") != -1) {
+         operationName = operationName.split(" ")[1];
+      }
+      return String.format("%s-%s-%s",
+            service.replace(" ", "").replace("-", ""),
+            version.replace(".", ""),
             operationName.replace("/", "-"));
    }
 }
