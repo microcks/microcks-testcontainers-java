@@ -125,6 +125,32 @@ The `TestResult` gives you access to all details regarding success of failure on
 
 A comprehensive Spring Boot demo application illustrating both usages is available here: [spring-boot-order-service](https://github.com/microcks/api-lifecycle/tree/master/shift-left-demo/spring-boot-order-service).
 
+### Using authentication Secrets
+
+It's a common need to authenticate to external systems like Http/Git repositories or external brokers. For that, the `MicrocksContainer`
+provides the `withSecret()` method to register authentication secrets at startup:
+
+```java
+microcks.withSecret(new Secret.Builder()
+      .name("localstack secret")
+      .username(localstack.getAccessKey())
+      .password(localstack.getSecretKey())
+      .build());
+microcks.start();
+```
+
+You may reuse this secret using its name later on during a test like this:
+
+```java
+TestRequest testRequest = new TestRequest.Builder()
+      .serviceId("Pastry orders API:0.1.0")
+      .runnerType(TestRunnerType.ASYNC_API_SCHEMA.name())
+      .testEndpoint("sqs://eu-east-1/pastry-orders?overrideUrl=http://localstack:45566")
+      .secretName("localstack secret")
+      .timeout(5000L)
+      .build();
+```
+
 ### Advanced features with MicrocksContainersEnsemble
 
 The `MicrocksContainer` referenced above supports essential features of Microcks provided by the main Microcks container.
@@ -136,13 +162,13 @@ The list of supported features is the following:
 * Mocking and contract-testing of GraphQL APIs,
 * Mocking and contract-testing of gRPC APIs.
 
-To support features like `POSTMAN` contract-testing, we introduced `MicrocksContainersEnsemble` that allows managing
-additional Microks services. `MicrocksContainersEnsemble` allow you to implement
+To support features like Asynchronous API and `POSTMAN` contract-testing, we introduced `MicrocksContainersEnsemble` that allows managing
+additional Microcks services. `MicrocksContainersEnsemble` allow you to implement
 [Different levels of API contract testing](https://medium.com/@lbroudoux/different-levels-of-api-contract-testing-with-microcks-ccc0847f8c97)
 in the Inner Loop with Testcontainers!
 
-A `MicrocksContainersEnsemble` conforms to Testcontaierns lifecycle methods and presents roughly the same interface
-as a `MicrocksContainers`. You can create and build an ensemble that way:
+A `MicrocksContainersEnsemble` conforms to Testcontainers lifecycle methods and presents roughly the same interface
+as a `MicrocksContainer`. You can create and build an ensemble that way:
 
 ```java
 MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(IMAGE)
@@ -161,6 +187,17 @@ microcks.importAsMainArtifact(...);
 microcks.getLogs();
 ```
 
+Please refer to our [MicrocksContainerTest](https://github.com/microcks/microcks-testcontainers-java/blob/main/src/test/java/io/github/microcks/testcontainers/MicrocksContainersEnsembleTest.java) for comprehensive example on how to use it.
+
+#### Postman contract-testing
+
+On this `ensemble` you may want to enable additional features such as Postman contract-testing:
+
+```java
+ensemble.withPostman();
+ensemble.start();
+```
+
 You can execute a `POSTMAN` test using an ensemble that way:
 
 ```java
@@ -174,4 +211,47 @@ TestRequest testRequest = new TestRequest.Builder()
 TestResult testResult = ensemble.getMicrocksContainer().testEndpoint(testRequest);
 ```
 
-Please refer to our [MicrocksContainerTest](https://github.com/microcks/microcks-testcontainers-java/blob/main/src/test/java/io/github/microcks/testcontainers/MicrocksContainersEnsembleTest.java) for comprehensive example on how to use it.
+#### Asynchronous API support
+
+Asynchronous API feature need to be explicitly enabled as well. In the case you want to use it for mocking purposes,
+you'll have to specify additional connection details to the broker of your choice. See an example below with connection
+to a Kafka broker:
+
+```java
+ensemble.withAsyncFeature()
+      .withKafkaConnection(new KafkaConnection("kafka:9092"));
+ensemble.start();
+```
+
+##### Using mock endpoints for your dependencies
+
+Once started, the `ensemble.getAsyncMinionContainer()` provides methods for retrieving mock endpoint names for the different
+supported protocols (WebSocket, Kafka, SQS and SNS).
+
+```java
+String kafkaTopic = ensemble.getAsyncMinionContainer()
+      .getKafkaMockTopic("Pastry orders API", "0.1.0", "SUBSCRIBE pastry/orders");
+```
+
+##### Launching new contract-tests
+
+Using contract-testing techniques on Asynchronous endpoints may require a different style of interacting with the Microcks
+container. For example, you may need to:
+1. Start the test making Microcks listen to the target async endpoint,
+2. Activate your System Under Tests so that it produces an event,
+3. Finalize the Microcks tests and actually ensure you received one or many well-formed events.
+
+For that the `MicrocksContainer` now provides a `testEndpointAsync(TestRequest request)` method that actually returns a `CompletableFuture`.
+Once invoked
+
+```java
+// Start the test, making Microcks listen the endpoint provided in testRequest
+CompletableFuture<TestResult> testResultFuture = ensemble.getMicrocksContainer().testEndpointAsync(testRequest);
+
+// Here below: activate your app to make it providuces events on this endpoint.
+// myapp.invokeBusinessMethodThatTriggerEvents();
+      
+// Now retrieve the final test result and assert.
+TestResult testResult = testResultFuture.get();
+assertTrue(testResult.isSuccess());
+```
