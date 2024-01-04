@@ -242,13 +242,13 @@ container. For example, you may need to:
 3. Finalize the Microcks tests and actually ensure you received one or many well-formed events.
 
 For that the `MicrocksContainer` now provides a `testEndpointAsync(TestRequest request)` method that actually returns a `CompletableFuture`.
-Once invoked
+Once invoked, you may trigger your application events and then `get()` the future result to assert like this:
 
 ```java
 // Start the test, making Microcks listen the endpoint provided in testRequest
 CompletableFuture<TestResult> testResultFuture = ensemble.getMicrocksContainer().testEndpointAsync(testRequest);
 
-// Here below: activate your app to make it providuces events on this endpoint.
+// Here below: activate your app to make it produce events on this endpoint.
 // myapp.invokeBusinessMethodThatTriggerEvents();
       
 // Now retrieve the final test result and assert.
