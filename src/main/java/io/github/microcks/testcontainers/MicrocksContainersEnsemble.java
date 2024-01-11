@@ -110,9 +110,7 @@ public class MicrocksContainersEnsemble implements Startable {
     * @return self
     */
    public MicrocksContainersEnsemble withKafkaConnection(KafkaConnection connection) {
-      if (this.asyncMinion == null) {
-         throw new IllegalStateException("Async feature must have been enabled first");
-      }
+      ensureAsyncFeatureIsEnabled();
       this.asyncMinion.withKafkaConnection(connection);
       return this;
    }
@@ -123,9 +121,7 @@ public class MicrocksContainersEnsemble implements Startable {
     * @return self
     */
    public MicrocksContainersEnsemble withAmazonSQSConnection(AmazonServiceConnection connection) {
-      if (this.asyncMinion == null) {
-         throw new IllegalStateException("Async feature must have been enabled first");
-      }
+      ensureAsyncFeatureIsEnabled();
       this.asyncMinion.withAmazonSQSConnection(connection);
       return this;
    }
@@ -136,9 +132,7 @@ public class MicrocksContainersEnsemble implements Startable {
     * @return self
     */
    public MicrocksContainersEnsemble withAmazonSNSConnection(AmazonServiceConnection connection) {
-      if (this.asyncMinion == null) {
-         throw new IllegalStateException("Async feature must have been enabled first");
-      }
+      ensureAsyncFeatureIsEnabled();
       this.asyncMinion.withAmazonSNSConnection(connection);
       return this;
    }
@@ -238,6 +232,12 @@ public class MicrocksContainersEnsemble implements Startable {
    @Override
    public void stop() {
       allContainers().parallel().forEach(GenericContainer::stop);
+   }
+
+   private void ensureAsyncFeatureIsEnabled() {
+      if (this.asyncMinion == null) {
+         throw new IllegalStateException("Async feature must have been enabled first");
+      }
    }
 
    private Stream<GenericContainer<?>> allContainers() {

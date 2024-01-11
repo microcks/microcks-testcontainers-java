@@ -5,13 +5,13 @@ Java library for Testcontainers that enables embedding Microcks into your JUnit 
 [![GitHub Workflow Status](https://img.shields.io/github/actions/workflow/status/microcks/microcks-testcontainers-java/build-verify.yml?logo=github&style=for-the-badge)](https://github.com/microcks/microcks-testcontainers-java/actions)
 [![Version](https://img.shields.io/maven-central/v/io.github.microcks/microcks-testcontainers?color=blue&style=for-the-badge)]((https://search.maven.org/artifact/io.github.microcks/microcks-testcontainers-java))
 [![License](https://img.shields.io/github/license/microcks/microcks-testcontainers-java?style=for-the-badge&logo=apache)](https://www.apache.org/licenses/LICENSE-2.0)
-[![Project Chat](https://img.shields.io/badge/chat-on_zulip-pink.svg?color=ff69b4&style=for-the-badge&logo=zulip)](https://microcksio.zulipchat.com/)
+[![Project Chat](https://img.shields.io/badge/discord-microcks-pink.svg?color=7289da&style=for-the-badge&logo=discord)](https://microcks.io/discord-invite/)
 
 ## Build Status
 
-Latest released version is `0.2.0`.
+Latest released version is `0.2.1`.
 
-Current development version is `0.2.1-SNAPSHOT`.
+Current development version is `0.2.2-SNAPSHOT`.
 
 #### Sonarcloud Quality metrics
 
@@ -32,7 +32,7 @@ If you're using Maven:
 <dependency>
   <groupId>io.github.microcks</groupId>
   <artifactId>microcks-testcontainers</artifactId>
-  <version>0.2.0</version>
+  <version>0.2.1</version>
 </dependency>
 ```
 
@@ -40,7 +40,7 @@ or if you're using Gradle:
 
 ```groovy
 dependencies {
-    testImplementation 'io.github.microcks:microcks-testcontainers:0.2.0'
+    testImplementation 'io.github.microcks:microcks-testcontainers:0.2.1'
 }
 ```
 
@@ -48,9 +48,11 @@ dependencies {
 
 You just have to specify the container image you'd like to use. This library requires a Microcks `uber` distribution (with no MongoDB dependency).
 
+Version `0.2.1` and above require version `1.8.1` of Microcks container images.
+
 ```java
 MicrocksContainer microcks = new MicrocksContainer(
-      DockerImageName.parse("quay.io/microcks/microcks-uber:1.8.0"));
+      DockerImageName.parse("quay.io/microcks/microcks-uber:1.8.1"));
 microcks.start();
 ```
 

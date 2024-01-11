@@ -79,7 +79,7 @@ import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
  */
 public class MicrocksContainersEnsembleTest {
 
-   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.8.0";
+   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.8.1";
 
    private static final DockerImageName BAD_PASTRY_IMAGE = DockerImageName.parse("quay.io/microcks/contract-testing-demo:02");
    private static final DockerImageName GOOD_PASTRY_IMAGE = DockerImageName.parse("quay.io/microcks/contract-testing-demo:03");
@@ -130,7 +130,7 @@ public class MicrocksContainersEnsembleTest {
    @Test
    public void testAsyncFeatureMockingFunctionality() throws Exception {
       try (
-            MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble("quay.io/microcks/microcks-uber:nightly")
+            MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(IMAGE)
                   .withMainArtifacts("pastry-orders-asyncapi.yml")
                   .withAsyncFeature();
       ) {
@@ -144,7 +144,7 @@ public class MicrocksContainersEnsembleTest {
    @Test
    public void testAsyncFeatureKafkaMockingFunctionality() throws Exception {
       try (
-            MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble("quay.io/microcks/microcks-uber:nightly")
+            MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(IMAGE)
                   .withMainArtifacts("pastry-orders-asyncapi.yml")
                   .withAsyncFeature()
                   .withKafkaConnection(new KafkaConnection("redpanda:19092"));
@@ -175,7 +175,7 @@ public class MicrocksContainersEnsembleTest {
                .withServices(LocalStackContainer.Service.SQS);
          localstack.start();
 
-         ensemble =  new MicrocksContainersEnsemble(network, "quay.io/microcks/microcks-uber:nightly")
+         ensemble =  new MicrocksContainersEnsemble(network, IMAGE)
                .withMainArtifacts("pastry-orders-asyncapi.yml")
                .withAsyncFeature()
                .withAmazonSQSConnection(new AmazonServiceConnection(localstack.getRegion(),
@@ -195,7 +195,7 @@ public class MicrocksContainersEnsembleTest {
    @Test
    public void testAsyncFeatureTestingFunctionality() throws Exception {
       try (
-            MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble("quay.io/microcks/microcks-uber:nightly")
+            MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(IMAGE)
                   .withMainArtifacts("pastry-orders-asyncapi.yml")
                   .withAsyncFeature();
 
@@ -221,7 +221,7 @@ public class MicrocksContainersEnsembleTest {
    @Test
    public void testAsyncFeatureKafkaTestingFunctionality() throws Exception {
       try (
-            MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble("quay.io/microcks/microcks-uber:nightly")
+            MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(IMAGE)
                   .withMainArtifacts("pastry-orders-asyncapi.yml")
                   .withAsyncFeature();
 
@@ -252,7 +252,7 @@ public class MicrocksContainersEnsembleTest {
                .withServices(LocalStackContainer.Service.SQS);
          localstack.start();
 
-         ensemble =  new MicrocksContainersEnsemble(network, "quay.io/microcks/microcks-uber:nightly")
+         ensemble =  new MicrocksContainersEnsemble(network, IMAGE)
                .withMainArtifacts("pastry-orders-asyncapi.yml")
                .withAsyncFeature()
                .withSecret(new Secret.Builder()
