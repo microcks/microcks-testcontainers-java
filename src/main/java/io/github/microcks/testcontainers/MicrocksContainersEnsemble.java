@@ -186,6 +186,19 @@ public class MicrocksContainersEnsemble implements Startable {
    }
 
    /**
+    * Delays the Async Minion container's creation and start until provided {@link Startable}s start first.
+    * Note that the circular dependencies are not supported.
+    * @param startables A list of {@link Startable} to depend on
+    * @return self
+    */
+   public MicrocksContainersEnsemble withAsyncDependsOn(Startable... startables) {
+      ensureAsyncFeatureIsEnabled();
+      this.asyncMinion.dependsOn(startables);
+      return this;
+   }
+
+
+   /**
     * Get the Docker network used by this ensemble of Microcks containers.
     * @return The network ensemble containers are attached to.
     */

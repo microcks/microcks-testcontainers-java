@@ -742,7 +742,7 @@ public class MicrocksContainersEnsembleTest {
 
       testResultFuture = null;
       try {
-         // First test should fail with validation failure messages.
+         // Second test should succeed without validation failure messages.
          testResultFuture = ensemble.getMicrocksContainer().testEndpointAsync(otherTestRequestDTO);
 
          final String finalQueueUrl = queueUrl;
