@@ -51,10 +51,19 @@ public class MicrocksContainersEnsemble implements Startable {
 
    /**
     * Build a new MicrocksContainersEnsemble with a pre-existing network and with its base container full image name.
-    * This image must be compatible with quay.io/microcks/microcks-uber image.
     * @param network The network to attach ensemble containers to.
+    * @param image This image must be compatible with quay.io/microcks/microcks-uber image.
     */
    public MicrocksContainersEnsemble(Network network, String image) {
+      this(network, DockerImageName.parse(image));
+   }
+
+   /**
+    * Build a new MicrocksContainersEnsemble with a pre-existing network and with its base container full image name.
+    * @param network The network to attach ensemble containers to.
+    * @param image This image must be compatible with quay.io/microcks/microcks-uber image.
+    */
+   public MicrocksContainersEnsemble(Network network, DockerImageName image) {
       this.network = network;
       this.microcks = new MicrocksContainer(image)
             .withNetwork(network)

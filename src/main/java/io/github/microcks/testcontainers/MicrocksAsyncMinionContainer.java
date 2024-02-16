@@ -70,6 +70,27 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
    }
 
    /**
+    * Build a new MicrocksAsyncMinionContainer with its container image name as string. This image must
+    * be compatible with quay.io/microcks/microcks-uber-async-minion image.
+    * @param network The network to attach this container to.
+    * @param imageName The name of Microcks Async Minion Uber distribution to use.
+    * @param microcksHost The microcks container hostname this minion will be bound to.
+    */
+   public MicrocksAsyncMinionContainer(Network network, DockerImageName imageName, String microcksHost) {
+      super(imageName);
+      imageName.assertCompatibleWith(MICROCKS_ASYNC_MINION_IMAGE);
+
+      withNetwork(network);
+      withNetworkAliases("microcks-async-minion");
+      withEnv("MICROCKS_HOST_PORT", microcksHost + ":" + MicrocksContainer.MICROCKS_HTTP_PORT);
+      withExposedPorts(MICROCKS_ASYNC_MINION_HTTP_PORT);
+
+      waitingFor(Wait.forLogMessage(".*Profile prod activated\\..*", 1));
+   }
+
+
+
+   /**
     * Connect the MicrocksAsyncMinionContainer to a Kafka server to allow Kafka messages mocking.
     * @param connection Connection details to a Kafka broker.
     * @return self
