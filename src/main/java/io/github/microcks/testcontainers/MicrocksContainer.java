@@ -146,7 +146,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          secondaryArtifactsToImport.stream().forEach((String artifactPath) -> this.importArtifact(artifactPath, false));
       }
       if (secrets != null && !secrets.isEmpty()) {
-         secrets.stream().forEach((Secret secret) -> this.createSecret(secret));
+         secrets.stream().forEach(this::createSecret);
       }
    }
 
@@ -236,9 +236,19 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     * @return A completable future that will allow to retrieve a TestResult once test is finished.
     */
    public CompletableFuture<TestResult> testEndpointAsync(TestRequest testRequest) {
+      return testEndpointAsync(getHttpEndpoint(), testRequest);
+   }
+
+   /**
+    * Launch a conformance test on an endpoint asynchronously.
+    * @param microcksContainerHttpEndpoint The Http endpoint where to reach running MicrocksContainer
+    * @param testRequest The test specifications (API under test, endpoint, runner, ...)
+    * @return A completable future that will allow to retrieve a TestResult once test is finished.
+    */
+   public static CompletableFuture<TestResult> testEndpointAsync(String microcksContainerHttpEndpoint, TestRequest testRequest) {
       return CompletableFuture.supplyAsync(() -> {
          try {
-            return MicrocksContainer.testEndpoint(getHttpEndpoint(), testRequest);
+            return MicrocksContainer.testEndpoint(microcksContainerHttpEndpoint, testRequest);
          } catch (Exception e) {
             throw new CompletionException(e);
          }
