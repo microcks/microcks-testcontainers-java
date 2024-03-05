@@ -619,9 +619,9 @@ public class MicrocksContainersEnsembleTest {
       // Other way of doing things via builder and fluent api.
       TestRequest otherTestRequestDTO = new TestRequest.Builder()
             .serviceId("Pastry orders API:0.1.0")
-            .runnerType(TestRunnerType.ASYNC_API_SCHEMA.name())
+            .runnerType(TestRunnerType.ASYNC_API_SCHEMA)
             .testEndpoint("kafka://kafka:19092/pastry-orders")
-            .timeout(3000L)
+            .timeout(Duration.ofSeconds(3))
             .build();
 
       // Second test should succeed without validation failure messages.

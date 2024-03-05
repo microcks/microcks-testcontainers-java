@@ -15,6 +15,7 @@
  */
 package io.github.microcks.testcontainers.model;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
@@ -117,6 +118,10 @@ public class TestRequest {
          this.runnerType = runnerType;
          return this;
       }
+      public Builder runnerType(TestRunnerType runnerType) {
+         this.runnerType = runnerType.name();
+         return this;
+      }
 
       public Builder secretName(String secretName) {
          this.secretName = secretName;
@@ -125,6 +130,10 @@ public class TestRequest {
 
       public Builder timeout(Long timeout) {
          this.timeout = timeout;
+         return this;
+      }
+      public Builder timeout(Duration duration) {
+         this.timeout = duration.toMillis();
          return this;
       }
 
