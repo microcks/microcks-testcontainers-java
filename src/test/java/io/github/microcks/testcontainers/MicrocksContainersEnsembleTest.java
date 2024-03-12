@@ -81,6 +81,8 @@ public class MicrocksContainersEnsembleTest {
 
    private static final String IMAGE = "quay.io/microcks/microcks-uber:1.8.1";
 
+   private static final String NATIVE_IMAGE = "quay.io/microcks/microcks-uber:nightly-native";
+
    private static final DockerImageName BAD_PASTRY_IMAGE = DockerImageName.parse("quay.io/microcks/contract-testing-demo:02");
    private static final DockerImageName GOOD_PASTRY_IMAGE = DockerImageName.parse("quay.io/microcks/contract-testing-demo:03");
 
@@ -125,6 +127,14 @@ public class MicrocksContainersEnsembleTest {
          ensemble.getMicrocksContainer().importAsSecondaryArtifact(new File("target/test-classes/apipastries-postman-collection.json"));
          testMicrocksContractTestingFunctionality(ensemble.getMicrocksContainer(), badImpl, goodImpl);
       }
+   }
+
+   @Test
+   public void testAsyncFeatureSetup() {
+      MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(NATIVE_IMAGE).withAsyncFeature();
+
+      assertEquals("quay.io/microcks/microcks-uber-async-minion:nightly",
+            ensemble.getAsyncMinionContainer().getDockerImageName());
    }
 
    @Test

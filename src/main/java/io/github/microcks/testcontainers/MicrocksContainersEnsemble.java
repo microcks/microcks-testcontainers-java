@@ -100,6 +100,9 @@ public class MicrocksContainersEnsemble implements Startable {
     */
    public MicrocksContainersEnsemble withAsyncFeature() {
       String image = microcks.getDockerImageName().replace("microcks-uber", "microcks-uber-async-minion");
+      if (image.endsWith("-native")) {
+         image = image.substring(0, image.length() - "-native".length());
+      }
       return withAsyncFeature(image);
    }
 
