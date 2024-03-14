@@ -56,6 +56,7 @@ public class MicrocksContainerTest {
       try (
             MicrocksContainer microcks = new MicrocksContainer(IMAGE)
                   .withMainArtifacts("apipastries-openapi.yaml")
+                  .withMainRemoteArtifacts("https://raw.githubusercontent.com/microcks/microcks/master/samples/APIPastry-openapi.yaml")
                   .withSecondaryArtifacts("apipastries-postman-collection.json");
       ) {
          microcks.start();
@@ -154,6 +155,17 @@ public class MicrocksContainerTest {
       assertEquals(200, eclairChocolat.getStatusCode());
       assertEquals("Eclair Chocolat", eclairChocolat.jsonPath().get("name"));
       //eclairChocolat.getBody().prettyPrint();
+
+      // Check that mock from main/primary remote artifact has been loaded.
+      baseApiUrl = microcks.getRestMockEndpoint("API Pastry - 2.0", "2.0.0");
+
+      millefeuille = RestAssured.given().when()
+            .get(baseApiUrl + "/pastry/Millefeuille")
+            .thenReturn();
+
+      assertEquals(200, millefeuille.getStatusCode());
+      assertEquals("Millefeuille", millefeuille.jsonPath().get("name"));
+      //millefeuille.getBody().prettyPrint();
    }
 
    private void testMicrocksContractTestingFunctionality(MicrocksContainer microcks, GenericContainer badImpl, GenericContainer goodImpl) throws Exception {

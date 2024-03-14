@@ -25,6 +25,9 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.lifecycle.Startable;
 import org.testcontainers.utility.DockerImageName;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -184,6 +187,28 @@ public class MicrocksContainersEnsemble implements Startable {
     */
    public MicrocksContainersEnsemble withSecondaryArtifacts(String... artifacts) {
       microcks.withSecondaryArtifacts(artifacts);
+      return this;
+   }
+
+   /**
+    * Provide urls to artifacts that will be imported as primary or main ones within the Microcks container
+    * once it will be started and healthy.
+    * @param remoteArtifactUrls A set of urls to artifacts that will be loaded as remote one
+    * @return self
+    */
+   public MicrocksContainersEnsemble withMainRemoteArtifacts(String... remoteArtifactUrls) {
+      microcks.withMainRemoteArtifacts(remoteArtifactUrls);
+      return this;
+   }
+
+   /**
+    * Provide urls to artifacts that will be imported as secondary ones within the Microcks container
+    * once it will be started and healthy.
+    * @param remoteArtifactUrls A set of urls to artifacts that will be loaded as remote one
+    * @return self
+    */
+   public MicrocksContainersEnsemble withSecondaryRemoteArtifacts(String... remoteArtifactUrls) {
+      microcks.withSecondaryRemoteArtifacts(remoteArtifactUrls);
       return this;
    }
 

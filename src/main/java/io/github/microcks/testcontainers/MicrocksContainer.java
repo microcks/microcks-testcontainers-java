@@ -33,6 +33,7 @@ import org.testcontainers.shaded.org.awaitility.core.ConditionTimeoutException;
 import org.testcontainers.utility.DockerImageName;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -71,6 +72,8 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
 
    private Set<String> mainArtifactsToImport;
    private Set<String> secondaryArtifactsToImport;
+   private Set<String> mainRemoteArtifactsToImport;
+   private Set<String> secondaryRemoteArtifactsToImport;
    private Set<Secret> secrets;
 
    /**
@@ -125,6 +128,34 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    }
 
    /**
+    * Provide urls to artifacts that will be imported as primary or main ones within the Microcks container
+    * once it will be started and healthy.
+    * @param remoteArtifactUrls A set of urls to artifacts that will be loaded as remote one
+    * @return self
+    */
+   public MicrocksContainer withMainRemoteArtifacts(String... remoteArtifactUrls) {
+      if (mainRemoteArtifactsToImport == null) {
+         mainRemoteArtifactsToImport = new HashSet<>();
+      }
+      mainRemoteArtifactsToImport.addAll(Arrays.stream(remoteArtifactUrls).collect(Collectors.toList()));
+      return self();
+   }
+
+   /**
+    * Provide urls to artifacts that will be imported as secondary ones within the Microcks container
+    * once it will be started and healthy.
+    * @param remoteArtifactUrls A set of urls to artifacts that will be loaded as remote one
+    * @return self
+    */
+   public MicrocksContainer withSecondaryRemoteArtifacts(String... remoteArtifactUrls) {
+      if (secondaryRemoteArtifactsToImport == null) {
+         secondaryRemoteArtifactsToImport = new HashSet<>();
+      }
+      secondaryRemoteArtifactsToImport.addAll(Arrays.stream(remoteArtifactUrls).collect(Collectors.toList()));
+      return self();
+   }
+
+   /**
     * Provide Secret that should be imported in Microcks after startup.
     * @param secret The description of a secret to access remote Git repotisory, test endpoint or broker.
     * @return self
@@ -140,13 +171,20 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    @Override
    protected void containerIsStarted(InspectContainerResponse containerInfo) {
       if (mainArtifactsToImport != null && !mainArtifactsToImport.isEmpty()) {
-         mainArtifactsToImport.stream().forEach((String artifactPath) -> this.importArtifact(artifactPath, true));
+         mainArtifactsToImport.forEach((String artifactPath) -> this.importArtifact(artifactPath, true));
       }
       if (secondaryArtifactsToImport != null && !secondaryArtifactsToImport.isEmpty()) {
-         secondaryArtifactsToImport.stream().forEach((String artifactPath) -> this.importArtifact(artifactPath, false));
+         secondaryArtifactsToImport.forEach((String artifactPath) -> this.importArtifact(artifactPath, false));
       }
+      // Load secrets before remote artifacts as they may be needed for authentication.
       if (secrets != null && !secrets.isEmpty()) {
-         secrets.stream().forEach(this::createSecret);
+         secrets.forEach(this::createSecret);
+      }
+      if (mainRemoteArtifactsToImport != null && !mainRemoteArtifactsToImport.isEmpty()) {
+         mainRemoteArtifactsToImport.forEach((String remoteArtifactUrl) -> this.downloadArtifact(remoteArtifactUrl, true));
+      }
+      if (secondaryRemoteArtifactsToImport != null && !secondaryRemoteArtifactsToImport.isEmpty()) {
+         secondaryRemoteArtifactsToImport.forEach((String remoteArtifactUrl) -> this.downloadArtifact(remoteArtifactUrl, false));
       }
    }
 
@@ -200,10 +238,9 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     * Import an artifact as a primary or main one within the Microcks container.
     * @param artifact The file representing artifact (OpenAPI, Postman collection, Protobuf, GraphQL schema, ...)
     * @throws IOException If file cannot be read of transmission exception occurs.
-    * @throws InterruptedException If connection to the docker container is interrupted.
     * @throws MicrocksException If artifact cannot be correctly imported in container (probably malformed)
     */
-   public void importAsMainArtifact(File artifact) throws IOException, InterruptedException, MicrocksException {
+   public void importAsMainArtifact(File artifact) throws IOException, MicrocksException {
       importArtifact(artifact, true);
    }
 
@@ -211,10 +248,9 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     * Import an artifact as a secondary one within the Microcks container.
     * @param artifact The file representing artifact (OpenAPI, Postman collection, Protobuf, GraphQL schema, ...)
     * @throws IOException If file cannot be read of transmission exception occurs.
-    * @throws InterruptedException If connection to the docker container is interrupted.
     * @throws MicrocksException If artifact cannot be correctly imported in container (probably malformed)
     */
-   public void importAsSecondaryArtifact(File artifact) throws IOException, InterruptedException, MicrocksException {
+   public void importAsSecondaryArtifact(File artifact) throws IOException, MicrocksException {
       importArtifact(artifact, false);
    }
 
@@ -223,10 +259,9 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     * @param testRequest The test specifications (API under test, endpoint, runner, ...)
     * @return The final TestResult containing information on success/failure as well as details on test cases.
     * @throws IOException If connection to Microcks container failed (no route to host, low-level network stuffs)
-    * @throws InterruptedException If connection to Microcks container is interrupted
     * @throws MicrocksException If Microcks fails creating a new test giving your request.
     */
-   public TestResult testEndpoint(TestRequest testRequest) throws IOException, InterruptedException, MicrocksException {
+   public TestResult testEndpoint(TestRequest testRequest) throws IOException, MicrocksException {
       return testEndpoint(getHttpEndpoint(), testRequest);
    }
 
@@ -392,6 +427,47 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       }
       // Disconnect Http connection.
       httpConn.disconnect();
+   }
+
+   private void downloadArtifact(String remoteArtifactUrl, boolean mainArtifact) {
+      try {
+         // Use the artifact/download endpoint to download the artifact.
+         URL url = new URL(getHttpEndpoint() + "/api/artifact/download");
+         HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
+         httpConn.setUseCaches(false);
+         httpConn.setRequestMethod("POST");
+         httpConn.setDoOutput(true);
+
+         String requestBody = "mainArtifact=" + mainArtifact + "&url=" + remoteArtifactUrl;
+
+         // Write the request body to the output stream of the connection
+         try (OutputStream os = httpConn.getOutputStream();
+              BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(os))) {
+            writer.write(requestBody);
+            writer.flush();
+         }
+
+         if (httpConn.getResponseCode() != 201) {
+            // Read response content for diagnostic purpose.
+            StringBuilder responseContent = new StringBuilder();
+            try (BufferedReader br = new BufferedReader(new InputStreamReader(httpConn.getInputStream(), StandardCharsets.UTF_8))) {
+               String responseLine = null;
+               while ((responseLine = br.readLine()) != null) {
+                  responseContent.append(responseLine.trim());
+               }
+            }
+            // Disconnect Http connection.
+            httpConn.disconnect();
+
+            log.error("Artifact has not been correctly downloaded: {}", responseContent);
+            throw new MicrocksException("Artifact has not been correctly downloaded: " + responseContent);
+         }
+         // Disconnect Http connection.
+         httpConn.disconnect();
+      } catch (Exception e) {
+         log.error("Could not load remote artifact: {}", remoteArtifactUrl);
+         throw new ArtifactLoadException("Error while importing remote artifact: " + remoteArtifactUrl, e);
+      }
    }
 
    private void createSecret(Secret secret) {
