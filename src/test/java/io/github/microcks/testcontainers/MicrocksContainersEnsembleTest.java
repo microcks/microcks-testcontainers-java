@@ -460,7 +460,7 @@ public class MicrocksContainersEnsembleTest {
                .build();
 
          // Wait a moment to be sure that minion has created the SQS queue.
-         await().pollDelay(1500, TimeUnit.MILLISECONDS)
+         await().pollDelay(2000, TimeUnit.MILLISECONDS)
                .untilAsserted(() -> assertTrue(true));
 
          // Retrieve this queue URL

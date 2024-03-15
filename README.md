@@ -9,9 +9,9 @@ Java library for Testcontainers that enables embedding Microcks into your JUnit 
 
 ## Build Status
 
-Latest released version is `0.2.4`.
+Latest released version is `0.2.5`.
 
-Current development version is `0.2.5-SNAPSHOT`.
+Current development version is `0.2.6-SNAPSHOT`.
 
 #### Sonarcloud Quality metrics
 
