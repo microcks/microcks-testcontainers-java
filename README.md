@@ -32,7 +32,7 @@ If you're using Maven:
 <dependency>
   <groupId>io.github.microcks</groupId>
   <artifactId>microcks-testcontainers</artifactId>
-  <version>0.2.4</version>
+  <version>0.2.5</version>
 </dependency>
 ```
 
@@ -40,7 +40,7 @@ or if you're using Gradle:
 
 ```groovy
 dependencies {
-    testImplementation 'io.github.microcks:microcks-testcontainers:0.2.3'
+    testImplementation 'io.github.microcks:microcks-testcontainers:0.2.5'
 }
 ```
 
