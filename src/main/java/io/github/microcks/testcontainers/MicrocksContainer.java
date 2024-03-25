@@ -170,6 +170,14 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
 
    @Override
    protected void containerIsStarted(InspectContainerResponse containerInfo) {
+      // Load remote artifacts before local ones.
+      if (mainRemoteArtifactsToImport != null && !mainRemoteArtifactsToImport.isEmpty()) {
+         mainRemoteArtifactsToImport.forEach((String remoteArtifactUrl) -> this.downloadArtifact(remoteArtifactUrl, true));
+      }
+      if (secondaryRemoteArtifactsToImport != null && !secondaryRemoteArtifactsToImport.isEmpty()) {
+         secondaryRemoteArtifactsToImport.forEach((String remoteArtifactUrl) -> this.downloadArtifact(remoteArtifactUrl, false));
+      }
+      // Load local ones that may override remote ones.
       if (mainArtifactsToImport != null && !mainArtifactsToImport.isEmpty()) {
          mainArtifactsToImport.forEach((String artifactPath) -> this.importArtifact(artifactPath, true));
       }
@@ -179,12 +187,6 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       // Load secrets before remote artifacts as they may be needed for authentication.
       if (secrets != null && !secrets.isEmpty()) {
          secrets.forEach(this::createSecret);
-      }
-      if (mainRemoteArtifactsToImport != null && !mainRemoteArtifactsToImport.isEmpty()) {
-         mainRemoteArtifactsToImport.forEach((String remoteArtifactUrl) -> this.downloadArtifact(remoteArtifactUrl, true));
-      }
-      if (secondaryRemoteArtifactsToImport != null && !secondaryRemoteArtifactsToImport.isEmpty()) {
-         secondaryRemoteArtifactsToImport.forEach((String remoteArtifactUrl) -> this.downloadArtifact(remoteArtifactUrl, false));
       }
    }
 
@@ -252,6 +254,24 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     */
    public void importAsSecondaryArtifact(File artifact) throws IOException, MicrocksException {
       importArtifact(artifact, false);
+   }
+
+   /**
+    * Download a remote artifact as a primary or main one within the Microcks container.
+    * @param remoteArtifactUrl The URL to remote artifact (OpenAPI, Postman collection, Protobuf, GraphQL schema, ...)
+    * @throws ArtifactLoadException If artifact cannot be correctly downloaded in container (probably not found)
+    */
+   public void downloadAsMainRemoteArtifact(String remoteArtifactUrl) throws ArtifactLoadException {
+      downloadArtifact(remoteArtifactUrl, true);
+   }
+
+   /**
+    * Download a remote artifact as a secondary one within the Microcks container.
+    * @param remoteArtifactUrl The URL to remote artifact (OpenAPI, Postman collection, Protobuf, GraphQL schema, ...)
+    * @throws ArtifactLoadException If artifact cannot be correctly downloaded in container (probably not found)
+    */
+   public void downloadAsSecondaryRemoteArtifact(String remoteArtifactUrl) throws ArtifactLoadException {
+      downloadArtifact(remoteArtifactUrl, false);
    }
 
    /**
@@ -429,7 +449,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       httpConn.disconnect();
    }
 
-   private void downloadArtifact(String remoteArtifactUrl, boolean mainArtifact) {
+   private void downloadArtifact(String remoteArtifactUrl, boolean mainArtifact) throws ArtifactLoadException {
       try {
          // Use the artifact/download endpoint to download the artifact.
          URL url = new URL(getHttpEndpoint() + "/api/artifact/download");

@@ -69,6 +69,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
@@ -79,7 +80,7 @@ import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
  */
 public class MicrocksContainersEnsembleTest {
 
-   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.8.1";
+   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.9.0";
 
    private static final String NATIVE_IMAGE = "quay.io/microcks/microcks-uber:nightly-native";
 
@@ -459,15 +460,24 @@ public class MicrocksContainersEnsembleTest {
                ))
                .build();
 
-         // Wait a moment to be sure that minion has created the SQS queue.
-         await().pollDelay(2000, TimeUnit.MILLISECONDS)
-               .untilAsserted(() -> assertTrue(true));
-
          // Retrieve this queue URL
          ListQueuesRequest listRequest = ListQueuesRequest.builder()
                .queueNamePrefix(sqsQueue).maxResults(1).build();
-         ListQueuesResponse listResponse = sqsClient.listQueues(listRequest);
-         String queueUrl = listResponse.queueUrls().get(0);
+         AtomicReference<String> queueUrl = new AtomicReference<>(null);
+
+         // Wait a moment to be sure that minion has created the SQS queue.
+         SqsClient finalSqsClient = sqsClient;
+         await().atMost(3, TimeUnit.SECONDS)
+               .pollDelay(500, TimeUnit.MILLISECONDS)
+               .pollDelay(500, TimeUnit.MILLISECONDS)
+               .until(() -> {
+                  ListQueuesResponse listResponse = finalSqsClient.listQueues(listRequest);
+                  if (!listResponse.queueUrls().isEmpty()) {
+                     queueUrl.set(listResponse.queueUrls().get(0));
+                     return true;
+                  }
+                  return false;
+               });
 
          // Now consumer the mock messages for 4 seconds.
          long startTime = System.currentTimeMillis();
@@ -475,7 +485,7 @@ public class MicrocksContainersEnsembleTest {
          while (System.currentTimeMillis() - startTime < 4000) {
             // Start polling/receiving messages with a max wait time and a max number.
             ReceiveMessageRequest messageRequest = ReceiveMessageRequest.builder()
-                  .queueUrl(queueUrl)
+                  .queueUrl(queueUrl.get())
                   .maxNumberOfMessages(10)
                   .waitTimeSeconds((int) (timeoutTime - System.currentTimeMillis()) / 1000)
                   .build();

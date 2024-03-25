@@ -29,6 +29,7 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 
 import java.io.File;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -45,7 +46,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class MicrocksContainerTest {
 
-   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.8.1";
+   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.9.0";
    private static final DockerImageName MICROCKS_IMAGE = DockerImageName.parse(IMAGE);
 
    private static final DockerImageName BAD_PASTRY_IMAGE = DockerImageName.parse("quay.io/microcks/contract-testing-demo:01");
@@ -218,7 +219,7 @@ public class MicrocksContainerTest {
             .runnerType(TestRunnerType.OPEN_API_SCHEMA.name())
             .testEndpoint("http://good-impl:3002")
             .operationsHeaders(operationsHeaders)
-            .timeout(2000L)
+            .timeout(Duration.ofSeconds(2))
             .build();
 
       testResult = microcks.testEndpoint(testRequestWithHeadersDTO);
