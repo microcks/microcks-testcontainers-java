@@ -9,9 +9,9 @@ Java library for Testcontainers that enables embedding Microcks into your JUnit 
 
 ## Build Status
 
-Latest released version is `0.2.5`.
+Latest released version is `0.2.6`.
 
-Current development version is `0.2.6-SNAPSHOT`.
+Current development version is `0.2.7-SNAPSHOT`.
 
 #### Sonarcloud Quality metrics
 
@@ -32,7 +32,7 @@ If you're using Maven:
 <dependency>
   <groupId>io.github.microcks</groupId>
   <artifactId>microcks-testcontainers</artifactId>
-  <version>0.2.5</version>
+  <version>0.2.6</version>
 </dependency>
 ```
 
@@ -40,7 +40,7 @@ or if you're using Gradle:
 
 ```groovy
 dependencies {
-    testImplementation 'io.github.microcks:microcks-testcontainers:0.2.5'
+    testImplementation 'io.github.microcks:microcks-testcontainers:0.2.6'
 }
 ```
 
@@ -115,7 +115,7 @@ public void testOpenAPIContract() throws Exception {
         .serviceId("API Pastries:0.0.1")
         .runnerType(TestRunnerType.OPEN_API_SCHEMA.name())
         .testEndpoint("http://host.testcontainers.internal:" + port)
-        .timeout(2000L)
+        .timeout(Duration.ofSeconds(2))
         .build();
 
     TestResult testResult = microcks.testEndpoint(testRequest);
