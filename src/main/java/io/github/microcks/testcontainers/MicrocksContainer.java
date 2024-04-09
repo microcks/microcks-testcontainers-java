@@ -243,7 +243,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     * @throws MicrocksException If artifact cannot be correctly imported in container (probably malformed)
     */
    public void importAsMainArtifact(File artifact) throws IOException, MicrocksException {
-      importArtifact(artifact, true);
+      MicrocksContainer.importArtifact(getHttpEndpoint(), artifact, true);
    }
 
    /**
@@ -253,25 +253,79 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     * @throws MicrocksException If artifact cannot be correctly imported in container (probably malformed)
     */
    public void importAsSecondaryArtifact(File artifact) throws IOException, MicrocksException {
-      importArtifact(artifact, false);
+      MicrocksContainer.importArtifact(getHttpEndpoint(), artifact, false);
    }
 
    /**
-    * Download a remote artifact as a primary or main one within the Microcks container.
-    * @param remoteArtifactUrl The URL to remote artifact (OpenAPI, Postman collection, Protobuf, GraphQL schema, ...)
-    * @throws ArtifactLoadException If artifact cannot be correctly downloaded in container (probably not found)
+    * Import an artifact as a primary or secondary one within the Microcks container. This may be a fallback to
+    * non-static {@code importArtifactAs...(File artifact)} method if you don't have direct access to the MicrocksContainer
+    * instance you want to import this artifact into.
+    * @param microcksContainerHttpEndpoint The Http endpoint where to reach running MicrocksContainer
+    * @param artifact The file representing artifact (OpenAPI, Postman collection, Protobuf, GraphQL schema, ...)
+    * @param mainArtifact Whether this artifact should be considered as main or secondary.
+    * @throws IOException If file cannot be read of transmission exception occurs.
+    * @throws MicrocksException If artifact cannot be correctly imported in container (probably malformed)
     */
-   public void downloadAsMainRemoteArtifact(String remoteArtifactUrl) throws ArtifactLoadException {
-      downloadArtifact(remoteArtifactUrl, true);
-   }
+   public static void importArtifact(String microcksContainerHttpEndpoint, File artifact, boolean mainArtifact) throws IOException, MicrocksException {
+      if (!artifact.exists()) {
+         throw new IOException("Artifact " + artifact.getPath() + " does not exist or can't be read.");
+      }
 
-   /**
-    * Download a remote artifact as a secondary one within the Microcks container.
-    * @param remoteArtifactUrl The URL to remote artifact (OpenAPI, Postman collection, Protobuf, GraphQL schema, ...)
-    * @throws ArtifactLoadException If artifact cannot be correctly downloaded in container (probably not found)
-    */
-   public void downloadAsSecondaryRemoteArtifact(String remoteArtifactUrl) throws ArtifactLoadException {
-      downloadArtifact(remoteArtifactUrl, false);
+      // Creates a unique boundary based on time stamp
+      String boundary = "===" + System.currentTimeMillis() + "===";
+
+      URL url = new URL(microcksContainerHttpEndpoint + "/api/artifact/upload" + (mainArtifact ? "" : "?mainArtifact=false"));
+      HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
+      httpConn.setUseCaches(false);
+      httpConn.setDoOutput(true);
+      httpConn.setDoInput(true);
+      httpConn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+
+      try (OutputStream os = httpConn.getOutputStream();
+           PrintWriter writer = new PrintWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8), true);
+           FileInputStream is = new FileInputStream(artifact)) {
+
+         writer.append("--" + boundary)
+               .append(HTTP_UPLOAD_LINE_FEED)
+               .append("Content-Disposition: form-data; name=\"file\"; filename=\"" + artifact.getName() + "\"")
+               .append(HTTP_UPLOAD_LINE_FEED)
+               .append("Content-Type: application/octet-stream")
+               .append(HTTP_UPLOAD_LINE_FEED)
+               .append("Content-Transfer-Encoding: binary")
+               .append(HTTP_UPLOAD_LINE_FEED)
+               .append(HTTP_UPLOAD_LINE_FEED);
+         writer.flush();
+
+         byte[] buffer = new byte[4096];
+         int bytesRead = -1;
+         while ((bytesRead = is.read(buffer)) != -1) {
+            os.write(buffer, 0, bytesRead);
+         }
+         os.flush();
+
+         // Finalize writer with a boundary before flushing.
+         writer.append(HTTP_UPLOAD_LINE_FEED)
+               .append("--" + boundary + "--")
+               .append(HTTP_UPLOAD_LINE_FEED).flush();
+      }
+
+      if (httpConn.getResponseCode() != 201) {
+         // Read response content for diagnostic purpose.
+         StringBuilder responseContent = new StringBuilder();
+         try (BufferedReader br = new BufferedReader(new InputStreamReader(httpConn.getInputStream(), StandardCharsets.UTF_8))) {
+            String responseLine = null;
+            while ((responseLine = br.readLine()) != null) {
+               responseContent.append(responseLine.trim());
+            }
+         }
+         // Disconnect Http connection.
+         httpConn.disconnect();
+
+         log.error("Artifact has not been correctly imported: {}", responseContent);
+         throw new MicrocksException("Artifact has not been correctly imported: " + responseContent);
+      }
+      // Disconnect Http connection.
+      httpConn.disconnect();
    }
 
    /**
@@ -370,6 +424,24 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       throw new MicrocksException("Couldn't launch on new test on Microcks. Please check Microcks container logs");
    }
 
+   /**
+    * Download a remote artifact as a primary or main one within the Microcks container.
+    * @param remoteArtifactUrl The URL to remote artifact (OpenAPI, Postman collection, Protobuf, GraphQL schema, ...)
+    * @throws ArtifactLoadException If artifact cannot be correctly downloaded in container (probably not found)
+    */
+   public void downloadAsMainRemoteArtifact(String remoteArtifactUrl) throws ArtifactLoadException {
+      downloadArtifact(remoteArtifactUrl, true);
+   }
+
+   /**
+    * Download a remote artifact as a secondary one within the Microcks container.
+    * @param remoteArtifactUrl The URL to remote artifact (OpenAPI, Postman collection, Protobuf, GraphQL schema, ...)
+    * @throws ArtifactLoadException If artifact cannot be correctly downloaded in container (probably not found)
+    */
+   public void downloadAsSecondaryRemoteArtifact(String remoteArtifactUrl) throws ArtifactLoadException {
+      downloadArtifact(remoteArtifactUrl, false);
+   }
+
    private void importArtifact(String artifactPath, boolean mainArtifact) {
       URL resource = Thread.currentThread().getContextClassLoader().getResource(artifactPath);
       if (resource == null) {
@@ -380,73 +452,11 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          }
       }
       try {
-         importArtifact(new File(resource.getFile()), mainArtifact);
+         importArtifact(getHttpEndpoint(), new File(resource.getFile()), mainArtifact);
       } catch (Exception e) {
          log.error("Could not load classpath artifact: {}", artifactPath);
          throw new ArtifactLoadException("Error while importing artifact: " + artifactPath, e);
       }
-   }
-
-   private void importArtifact(File artifact, boolean mainArtifact) throws IOException, MicrocksException {
-      if (!artifact.exists()) {
-         throw new IOException("Artifact " + artifact.getPath() + " does not exist or can't be read.");
-      }
-
-      // Creates a unique boundary based on time stamp
-      String boundary = "===" + System.currentTimeMillis() + "===";
-
-      URL url = new URL(getHttpEndpoint() + "/api/artifact/upload" + (mainArtifact ? "" : "?mainArtifact=false"));
-      HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
-      httpConn.setUseCaches(false);
-      httpConn.setDoOutput(true);
-      httpConn.setDoInput(true);
-      httpConn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
-
-      try (OutputStream os = httpConn.getOutputStream();
-           PrintWriter writer = new PrintWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8), true);
-           FileInputStream is = new FileInputStream(artifact)) {
-
-         writer.append("--" + boundary)
-               .append(HTTP_UPLOAD_LINE_FEED)
-               .append("Content-Disposition: form-data; name=\"file\"; filename=\"" + artifact.getName() + "\"")
-               .append(HTTP_UPLOAD_LINE_FEED)
-               .append("Content-Type: application/octet-stream")
-               .append(HTTP_UPLOAD_LINE_FEED)
-               .append("Content-Transfer-Encoding: binary")
-               .append(HTTP_UPLOAD_LINE_FEED)
-               .append(HTTP_UPLOAD_LINE_FEED);
-         writer.flush();
-
-         byte[] buffer = new byte[4096];
-         int bytesRead = -1;
-         while ((bytesRead = is.read(buffer)) != -1) {
-            os.write(buffer, 0, bytesRead);
-         }
-         os.flush();
-
-         // Finalize writer with a boundary before flushing.
-         writer.append(HTTP_UPLOAD_LINE_FEED)
-               .append("--" + boundary + "--")
-               .append(HTTP_UPLOAD_LINE_FEED).flush();
-      }
-
-      if (httpConn.getResponseCode() != 201) {
-         // Read response content for diagnostic purpose.
-         StringBuilder responseContent = new StringBuilder();
-         try (BufferedReader br = new BufferedReader(new InputStreamReader(httpConn.getInputStream(), StandardCharsets.UTF_8))) {
-            String responseLine = null;
-            while ((responseLine = br.readLine()) != null) {
-               responseContent.append(responseLine.trim());
-            }
-         }
-         // Disconnect Http connection.
-         httpConn.disconnect();
-
-         log.error("Artifact has not been correctly imported: {}", responseContent);
-         throw new MicrocksException("Artifact has not been correctly imported: " + responseContent);
-      }
-      // Disconnect Http connection.
-      httpConn.disconnect();
    }
 
    private void downloadArtifact(String remoteArtifactUrl, boolean mainArtifact) throws ArtifactLoadException {
