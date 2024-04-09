@@ -70,6 +70,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
 
    private static ObjectMapper mapper;
 
+   private Set<String> snapshotsToImport;
    private Set<String> mainArtifactsToImport;
    private Set<String> secondaryArtifactsToImport;
    private Set<String> mainRemoteArtifactsToImport;
@@ -156,6 +157,20 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    }
 
    /**
+    * Provide paths to local repository snapshots that will be imported within the Microcks container
+    * once it will be started and healthy.
+    * @param snapshots A set of repository snapshots that will be loaded as classpath resources
+    * @return self
+    */
+   public MicrocksContainer withSnapshots(String... snapshots) {
+      if (snapshotsToImport == null) {
+         snapshotsToImport = new HashSet<>();
+      }
+      snapshotsToImport.addAll(Arrays.stream(snapshots).collect(Collectors.toList()));
+      return self();
+   }
+
+   /**
     * Provide Secret that should be imported in Microcks after startup.
     * @param secret The description of a secret to access remote Git repotisory, test endpoint or broker.
     * @return self
@@ -170,6 +185,10 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
 
    @Override
    protected void containerIsStarted(InspectContainerResponse containerInfo) {
+      // Load snapshots before anything else.
+      if (snapshotsToImport != null && !snapshotsToImport.isEmpty()) {
+         snapshotsToImport.forEach(this::importSnapshot);
+      }
       // Load remote artifacts before local ones.
       if (mainRemoteArtifactsToImport != null && !mainRemoteArtifactsToImport.isEmpty()) {
          mainRemoteArtifactsToImport.forEach((String remoteArtifactUrl) -> this.downloadArtifact(remoteArtifactUrl, true));
@@ -257,6 +276,16 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    }
 
    /**
+    * Import a repository snapshot within the Microcks container.
+    * @param snapshot The file representing the Microcks repository snapshot
+    * @throws IOException If file cannot be read of transmission exception occurs.
+    * @throws MicrocksException If artifact cannot be correctly imported in container (probably malformed)
+    */
+   public void importSnapshot(File snapshot) throws IOException, MicrocksException {
+      MicrocksContainer.importSnapshot(getHttpEndpoint(), snapshot);
+   }
+
+   /**
     * Import an artifact as a primary or secondary one within the Microcks container. This may be a fallback to
     * non-static {@code importArtifactAs...(File artifact)} method if you don't have direct access to the MicrocksContainer
     * instance you want to import this artifact into.
@@ -271,43 +300,8 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          throw new IOException("Artifact " + artifact.getPath() + " does not exist or can't be read.");
       }
 
-      // Creates a unique boundary based on time stamp
-      String boundary = "===" + System.currentTimeMillis() + "===";
-
       URL url = new URL(microcksContainerHttpEndpoint + "/api/artifact/upload" + (mainArtifact ? "" : "?mainArtifact=false"));
-      HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
-      httpConn.setUseCaches(false);
-      httpConn.setDoOutput(true);
-      httpConn.setDoInput(true);
-      httpConn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
-
-      try (OutputStream os = httpConn.getOutputStream();
-           PrintWriter writer = new PrintWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8), true);
-           FileInputStream is = new FileInputStream(artifact)) {
-
-         writer.append("--" + boundary)
-               .append(HTTP_UPLOAD_LINE_FEED)
-               .append("Content-Disposition: form-data; name=\"file\"; filename=\"" + artifact.getName() + "\"")
-               .append(HTTP_UPLOAD_LINE_FEED)
-               .append("Content-Type: application/octet-stream")
-               .append(HTTP_UPLOAD_LINE_FEED)
-               .append("Content-Transfer-Encoding: binary")
-               .append(HTTP_UPLOAD_LINE_FEED)
-               .append(HTTP_UPLOAD_LINE_FEED);
-         writer.flush();
-
-         byte[] buffer = new byte[4096];
-         int bytesRead = -1;
-         while ((bytesRead = is.read(buffer)) != -1) {
-            os.write(buffer, 0, bytesRead);
-         }
-         os.flush();
-
-         // Finalize writer with a boundary before flushing.
-         writer.append(HTTP_UPLOAD_LINE_FEED)
-               .append("--" + boundary + "--")
-               .append(HTTP_UPLOAD_LINE_FEED).flush();
-      }
+      HttpURLConnection httpConn = uploadFileToMicrocks(url, artifact, "application/octet-stream");
 
       if (httpConn.getResponseCode() != 201) {
          // Read response content for diagnostic purpose.
@@ -323,6 +317,42 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
 
          log.error("Artifact has not been correctly imported: {}", responseContent);
          throw new MicrocksException("Artifact has not been correctly imported: " + responseContent);
+      }
+      // Disconnect Http connection.
+      httpConn.disconnect();
+   }
+
+   /**
+    * Import a repository snapshot within the Microcks container. This may be a fallback to
+    * non-static {@code importSnapshot(File artifact)} method if you don't have direct access to the MicrocksContainer
+    * instance you want to import this snapshot into.
+    * @param microcksContainerHttpEndpoint The Http endpoint where to reach running MicrocksContainer
+    * @param snapshot The file representing the Microcks repository snapshot
+    * @throws IOException If file cannot be read of transmission exception occurs.
+    * @throws MicrocksException If artifact cannot be correctly imported in container (probably malformed)
+    */
+   public static void importSnapshot(String microcksContainerHttpEndpoint, File snapshot) throws IOException, MicrocksException {
+      if (!snapshot.exists()) {
+         throw new IOException("Snapshot " + snapshot.getPath() + " does not exist or can't be read.");
+      }
+
+      URL url = new URL(microcksContainerHttpEndpoint + "/api/import");
+      HttpURLConnection httpConn = uploadFileToMicrocks(url, snapshot, "application/json");
+
+      if (httpConn.getResponseCode() != 201) {
+         // Read response content for diagnostic purpose.
+         StringBuilder responseContent = new StringBuilder();
+         try (BufferedReader br = new BufferedReader(new InputStreamReader(httpConn.getInputStream(), StandardCharsets.UTF_8))) {
+            String responseLine = null;
+            while ((responseLine = br.readLine()) != null) {
+               responseContent.append(responseLine.trim());
+            }
+         }
+         // Disconnect Http connection.
+         httpConn.disconnect();
+
+         log.error("Snapshot has not been correctly imported: {}", responseContent);
+         throw new MicrocksException("Snapshot has not been correctly imported: " + responseContent);
       }
       // Disconnect Http connection.
       httpConn.disconnect();
@@ -452,7 +482,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          }
       }
       try {
-         importArtifact(getHttpEndpoint(), new File(resource.getFile()), mainArtifact);
+         MicrocksContainer.importArtifact(getHttpEndpoint(), new File(resource.getFile()), mainArtifact);
       } catch (Exception e) {
          log.error("Could not load classpath artifact: {}", artifactPath);
          throw new ArtifactLoadException("Error while importing artifact: " + artifactPath, e);
@@ -497,6 +527,23 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       } catch (Exception e) {
          log.error("Could not load remote artifact: {}", remoteArtifactUrl);
          throw new ArtifactLoadException("Error while importing remote artifact: " + remoteArtifactUrl, e);
+      }
+   }
+
+   private void importSnapshot(String snapshotPath) {
+      URL resource = Thread.currentThread().getContextClassLoader().getResource(snapshotPath);
+      if (resource == null) {
+         resource = MicrocksContainer.class.getClassLoader().getResource(snapshotPath);
+         if (resource == null) {
+            log.warn("Could not load classpath snapshot: {}", snapshotPath);
+            throw new ArtifactLoadException("Error while importing snasphot: " + snapshotPath);
+         }
+      }
+      try {
+         MicrocksContainer.importSnapshot(getHttpEndpoint(), new File(resource.getFile()));
+      } catch (Exception e) {
+         log.error("Could not load classpath snapshot: {}", snapshotPath);
+         throw new ArtifactLoadException("Error while importing snapshot: " + snapshotPath, e);
       }
    }
 
@@ -548,6 +595,47 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          mapper.setPropertyInclusion(JsonInclude.Value.construct(JsonInclude.Include.NON_NULL, JsonInclude.Include.NON_NULL));
       }
       return mapper;
+   }
+
+   private static HttpURLConnection uploadFileToMicrocks(URL microcksApiURL, File file, String contentType) throws IOException {
+      // Creates a unique boundary based on time stamp
+      String boundary = "===" + System.currentTimeMillis() + "===";
+
+      HttpURLConnection httpConn = (HttpURLConnection) microcksApiURL.openConnection();
+      httpConn.setUseCaches(false);
+      httpConn.setDoOutput(true);
+      httpConn.setDoInput(true);
+      httpConn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+
+      try (OutputStream os = httpConn.getOutputStream();
+           PrintWriter writer = new PrintWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8), true);
+           FileInputStream is = new FileInputStream(file)) {
+
+         writer.append("--" + boundary)
+               .append(HTTP_UPLOAD_LINE_FEED)
+               .append("Content-Disposition: form-data; name=\"file\"; filename=\"" + file.getName() + "\"")
+               .append(HTTP_UPLOAD_LINE_FEED)
+               .append("Content-Type: " + contentType)
+               .append(HTTP_UPLOAD_LINE_FEED)
+               .append("Content-Transfer-Encoding: binary")
+               .append(HTTP_UPLOAD_LINE_FEED)
+               .append(HTTP_UPLOAD_LINE_FEED);
+         writer.flush();
+
+         byte[] buffer = new byte[4096];
+         int bytesRead = -1;
+         while ((bytesRead = is.read(buffer)) != -1) {
+            os.write(buffer, 0, bytesRead);
+         }
+         os.flush();
+
+         // Finalize writer with a boundary before flushing.
+         writer.append(HTTP_UPLOAD_LINE_FEED)
+               .append("--" + boundary + "--")
+               .append(HTTP_UPLOAD_LINE_FEED).flush();
+      }
+
+      return httpConn;
    }
 
    private static TestResult refreshTestResult(String microcksContainerHttpEndpoint, String testResultId) throws IOException {

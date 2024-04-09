@@ -35,6 +35,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -56,12 +57,14 @@ public class MicrocksContainerTest {
    public void testMockingFunctionality() throws Exception {
       try (
             MicrocksContainer microcks = new MicrocksContainer(IMAGE)
+                  .withSnapshots("microcks-repository.json")
                   .withMainArtifacts("apipastries-openapi.yaml")
                   .withMainRemoteArtifacts("https://raw.githubusercontent.com/microcks/microcks/master/samples/APIPastry-openapi.yaml")
                   .withSecondaryArtifacts("apipastries-postman-collection.json");
       ) {
          microcks.start();
          testMicrocksConfigRetrieval(microcks.getHttpEndpoint());
+         testAvailableServices(microcks.getHttpEndpoint());
 
          testMockEndpoints(microcks);
          testMicrocksMockingFunctionality(microcks);
@@ -120,6 +123,28 @@ public class MicrocksContainerTest {
             .thenReturn();
 
       assertEquals(200, keycloakConfig.getStatusCode());
+   }
+
+   private void testAvailableServices(String endpointUrl) {
+      Response services = RestAssured.given().when()
+            .get(endpointUrl + "/api/services")
+            .thenReturn();
+
+      assertEquals(200, services.getStatusCode());
+      assertEquals(6, services.jsonPath().getList(".").size());
+
+      List<String> names = services.jsonPath().getList(".").stream()
+            .map(service -> ((Map)service).get("name").toString())
+            .collect(Collectors.toList());
+
+      // Check the six loaded services are correct.
+      assertTrue(names.contains("API Pastries"));
+      assertTrue(names.contains("API Pastry - 2.0"));
+      assertTrue(names.contains("HelloService Mock"));
+      assertTrue(names.contains("Movie Graph API"));
+      assertTrue(names.contains("Petstore API"));
+      assertTrue(names.contains("io.github.microcks.grpc.hello.v1.HelloService"));
+
    }
 
    private void testMockEndpoints(MicrocksContainer microcks) {
