@@ -9,9 +9,9 @@ Java library for Testcontainers that enables embedding Microcks into your JUnit 
 
 ## Build Status
 
-Latest released version is `0.2.6`.
+Latest released version is `0.2.7`.
 
-Current development version is `0.2.7-SNAPSHOT`.
+Current development version is `0.2.8-SNAPSHOT`.
 
 #### Sonarcloud Quality metrics
 
@@ -32,7 +32,7 @@ If you're using Maven:
 <dependency>
   <groupId>io.github.microcks</groupId>
   <artifactId>microcks-testcontainers</artifactId>
-  <version>0.2.6</version>
+  <version>0.2.7</version>
 </dependency>
 ```
 
@@ -40,7 +40,7 @@ or if you're using Gradle:
 
 ```groovy
 dependencies {
-    testImplementation 'io.github.microcks:microcks-testcontainers:0.2.6'
+    testImplementation 'io.github.microcks:microcks-testcontainers:0.2.7'
 }
 ```
 
@@ -64,7 +64,7 @@ Artifacts can be imported as main/Primary ones or as secondary ones. See [Multi-
 You can do it before starting the container using simple paths:
 
 ```java
-MicrocksContainer microcks = new MicrocksContainer(DockerImageName.parse("quay.io/microcks/microcks-uber:1.8.1"))
+MicrocksContainer microcks = new MicrocksContainer(DockerImageName.parse("quay.io/microcks/microcks-uber:1.9.0"))
     .withMainArtifacts("apipastries-openapi.yaml")
     .withSecondaryArtifacts("apipastries-postman-collection.json");
 microcks.start();
@@ -78,6 +78,15 @@ microcks.importAsSecondaryArtifact(new File("target/test-classes/apipastries-pos
 ```
 
 Please refer to our [MicrocksContainerTest](https://github.com/microcks/microcks-testcontainers-java/blob/main/src/test/java/io/github/microcks/testcontainers/MicrocksContainerTest.java) for comprehensive example on how to use it.
+
+Starting with version `0.2.7` you can also import full 
+[repository snapshots](https://microcks.io/documentation/administrating/snapshots/) at once:
+
+```java
+MicrocksContainer microcks = new MicrocksContainer(DockerImageName.parse("quay.io/microcks/microcks-uber:1.9.0"))
+      .withSnapshots("microcks-repository.json");
+microcks.start();
+```
 
 ### Using mock endpoints for your dependencies
 
