@@ -484,7 +484,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       }
       try {
          // Decode resource file path that may contain spaces converted into %20.
-         File resourceFile = new File(URLDecoder.decode(resource.getFile(), StandardCharsets.UTF_8));
+         File resourceFile = new File(URLDecoder.decode(resource.getFile(), StandardCharsets.UTF_8.name()));
          MicrocksContainer.importArtifact(getHttpEndpoint(), resourceFile, mainArtifact);
       } catch (Exception e) {
          log.error("Could not load classpath artifact: {}", artifactPath);
