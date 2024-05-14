@@ -9,9 +9,9 @@ Java library for Testcontainers that enables embedding Microcks into your JUnit 
 
 ## Build Status
 
-Latest released version is `0.2.7`.
+Latest released version is `0.2.8`.
 
-Current development version is `0.2.8-SNAPSHOT`.
+Current development version is `0.2.9-SNAPSHOT`.
 
 #### Sonarcloud Quality metrics
 
@@ -32,7 +32,7 @@ If you're using Maven:
 <dependency>
   <groupId>io.github.microcks</groupId>
   <artifactId>microcks-testcontainers</artifactId>
-  <version>0.2.7</version>
+  <version>0.2.8</version>
 </dependency>
 ```
 
@@ -40,7 +40,7 @@ or if you're using Gradle:
 
 ```groovy
 dependencies {
-    testImplementation 'io.github.microcks:microcks-testcontainers:0.2.7'
+    testImplementation 'io.github.microcks:microcks-testcontainers:0.2.8'
 }
 ```
 
@@ -52,7 +52,7 @@ Version `0.2.1` and above require version `1.8.1` of Microcks container images.
 
 ```java
 MicrocksContainer microcks = new MicrocksContainer(
-      DockerImageName.parse("quay.io/microcks/microcks-uber:1.8.1"));
+      DockerImageName.parse("quay.io/microcks/microcks-uber:1.9.0"));
 microcks.start();
 ```
 
