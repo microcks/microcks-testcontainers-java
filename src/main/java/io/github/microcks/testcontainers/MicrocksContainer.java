@@ -43,6 +43,7 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -482,7 +483,9 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          }
       }
       try {
-         MicrocksContainer.importArtifact(getHttpEndpoint(), new File(resource.getFile()), mainArtifact);
+         // Decode resource file path that may contain spaces converted into %20.
+         File resourceFile = new File(URLDecoder.decode(resource.getFile(), StandardCharsets.UTF_8));
+         MicrocksContainer.importArtifact(getHttpEndpoint(), resourceFile, mainArtifact);
       } catch (Exception e) {
          log.error("Could not load classpath artifact: {}", artifactPath);
          throw new ArtifactLoadException("Error while importing artifact: " + artifactPath, e);

@@ -58,7 +58,7 @@ public class MicrocksContainerTest {
       try (
             MicrocksContainer microcks = new MicrocksContainer(IMAGE)
                   .withSnapshots("microcks-repository.json")
-                  .withMainArtifacts("apipastries-openapi.yaml")
+                  .withMainArtifacts("apipastries-openapi.yaml", "sub dir/weather-forecast-openapi.yaml")
                   .withMainRemoteArtifacts("https://raw.githubusercontent.com/microcks/microcks/master/samples/APIPastry-openapi.yaml")
                   .withSecondaryArtifacts("apipastries-postman-collection.json");
       ) {
@@ -131,20 +131,20 @@ public class MicrocksContainerTest {
             .thenReturn();
 
       assertEquals(200, services.getStatusCode());
-      assertEquals(6, services.jsonPath().getList(".").size());
+      assertEquals(7, services.jsonPath().getList(".").size());
 
       List<String> names = services.jsonPath().getList(".").stream()
             .map(service -> ((Map)service).get("name").toString())
             .collect(Collectors.toList());
 
-      // Check the six loaded services are correct.
+      // Check the seven loaded services are correct.
       assertTrue(names.contains("API Pastries"));
+      assertTrue(names.contains("WeatherForecast API"));
       assertTrue(names.contains("API Pastry - 2.0"));
       assertTrue(names.contains("HelloService Mock"));
       assertTrue(names.contains("Movie Graph API"));
       assertTrue(names.contains("Petstore API"));
       assertTrue(names.contains("io.github.microcks.grpc.hello.v1.HelloService"));
-
    }
 
    private void testMockEndpoints(MicrocksContainer microcks) {
