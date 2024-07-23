@@ -143,6 +143,17 @@ public class MicrocksContainersEnsemble implements Startable {
    }
 
    /**
+    * Once the Async Feature is enabled, connects to an AMQP broker.
+    * @param connection Connection details to an AMQP broker.
+    * @return self
+    */
+   public MicrocksContainersEnsemble withAMQPConnection(GenericConnection connection) {
+      ensureAsyncFeatureIsEnabled();
+      this.asyncMinion.withAMQPConnection(connection);
+      return this;
+   }
+
+   /**
     * Once the Async Feature is enabled, connects to an Amazon SQS service.
     * @param connection Connection details to an Amazon SQS service.
     * @return self

@@ -23,6 +23,12 @@ channels:
     bindings:
       ws:
         method: POST
+      amqp:
+        is: routingKey
+        exchange:
+          type: topic
+          durable: true
+          autoDelete: false
 components:
   messages:
     PastryOrder:

@@ -26,6 +26,12 @@ import io.github.microcks.testcontainers.model.TestStepResult;
 
 import com.hivemq.client.mqtt.mqtt3.Mqtt3BlockingClient;
 import com.hivemq.client.mqtt.mqtt3.Mqtt3Client;
+import com.rabbitmq.client.AMQP;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
+import com.rabbitmq.client.DefaultConsumer;
+import com.rabbitmq.client.Envelope;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -47,6 +53,7 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.Network;
+import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -63,6 +70,7 @@ import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -71,6 +79,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -195,6 +204,29 @@ public class MicrocksContainersEnsembleTest {
          testMicrocksConfigRetrieval(ensemble.getMicrocksContainer().getHttpEndpoint());
 
          testMicrocksAsyncMQTTMockingFunctionality(ensemble, hivemq);
+      }
+   }
+
+   @Test
+   public void testAsyncFeatureAMQPMockingFunctionality() throws Exception {
+      try (
+            MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(NATIVE_IMAGE)
+                  .withMainArtifacts("pastry-orders-asyncapi.yml")
+                  .withAsyncFeature()
+                  .withAMQPConnection(new GenericConnection("rabbitmq:5672", "test", "test"));
+
+            RabbitMQContainer rabbitmq = new RabbitMQContainer(DockerImageName.parse("rabbitmq:3.9.13-management-alpine"))
+                  .withNetwork(ensemble.getNetwork())
+                  .withNetworkAliases("rabbitmq");
+      ) {
+         rabbitmq.start();
+         rabbitmq.execInContainer("rabbitmqctl", "add_user", "test", "test");
+         rabbitmq.execInContainer("rabbitmqctl", "set_permissions", "-p", "/", "test", ".*", ".*", ".*");
+
+         ensemble.start();
+         testMicrocksConfigRetrieval(ensemble.getMicrocksContainer().getHttpEndpoint());
+
+         testMicrocksAsyncAMQPMockingFunctionality(ensemble, rabbitmq);
       }
    }
 
@@ -496,6 +528,47 @@ public class MicrocksContainersEnsembleTest {
          fail("Exception while connecting to MQTT broker", e);
       } finally {
          client.disconnect();
+      }
+
+      // Compare messages.
+      assertNotNull(message.get());
+      assertTrue(message.get().length() > 1);
+      assertEquals(expectedMessage, message.get());
+   }
+
+   private void testMicrocksAsyncAMQPMockingFunctionality(MicrocksContainersEnsemble ensemble, RabbitMQContainer rabbitmq) {
+      // PastryordersAPI-0.1.0-pastry/orders
+      String amqpDestination = ensemble.getAsyncMinionContainer().getAMQPMockDestination("Pastry orders API", "0.1.0", "SUBSCRIBE pastry/orders");
+      String expectedMessage = "{\"id\":\"4dab240d-7847-4e25-8ef3-1530687650c8\",\"customerId\":\"fe1088b3-9f30-4dc1-a93d-7b74f0a072b9\",\"status\":\"VALIDATED\",\"productQuantities\":[{\"quantity\":2,\"pastryName\":\"Croissant\"},{\"quantity\":1,\"pastryName\":\"Millefeuille\"}]}";
+
+      // Initialize RabbitMQ consumer to receive 1 message.
+      ConnectionFactory factory = new ConnectionFactory();
+      factory.setHost(rabbitmq.getHost());
+      factory.setPort(rabbitmq.getAmqpPort());
+
+      AtomicReference<String> message = new AtomicReference<>();
+
+      try (Connection connection = factory.newConnection()) {
+         Channel channel = connection.createChannel();
+
+         channel.exchangeDeclare(amqpDestination, "topic", false);
+         String queueName = channel.queueDeclare().getQueue();
+         channel.queueBind(queueName, amqpDestination, "#");
+
+         String consumerTag = channel.basicConsume(queueName, false, new DefaultConsumer(channel) {
+            @Override
+            public void handleDelivery(String consumerTag, Envelope envelope, AMQP.BasicProperties properties, byte[] body)
+                  throws IOException {
+               message.set(new String(body, StandardCharsets.UTF_8));
+               channel.basicAck(envelope.getDeliveryTag(), false);
+            }
+         });
+
+         Thread.sleep(4000L);
+
+         channel.close();
+      } catch (Exception e) {
+         fail("Exception while connecting to AMQP broker", e);
       }
 
       // Compare messages.

@@ -93,7 +93,6 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
    }
 
 
-
    /**
     * Connect the MicrocksAsyncMinionContainer to a Kafka server to allow Kafka messages mocking.
     * @param connection Connection details to a Kafka broker.
@@ -121,6 +120,22 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
       withEnv("MQTT_SERVER", connection.getServer());
       withEnv("MQTT_USERNAME", connection.getUsername());
       withEnv("MQTT_USERNAME", connection.getPassword());
+      return this;
+   }
+
+   /**
+    * Connect the MicrocksAsyncMinionContainer to a RabbitMQ server to allow AMQP messages mocking.
+    * @param connection Connection details to the RabbitMQ server.
+    * @return self
+    */
+   public MicrocksAsyncMinionContainer withAMQPConnection(GenericConnection connection) {
+      if (!extraProtocols.contains(",AMQP")) {
+         extraProtocols += ",AMQP";
+      }
+      withEnv(ASYNC_PROTOCOLS_ENV_VAR, extraProtocols);
+      withEnv("AMQP_SERVER", connection.getServer());
+      withEnv("AMQP_USERNAME", connection.getUsername());
+      withEnv("AMQP_PASSWORD", connection.getPassword());
       return this;
    }
 
@@ -214,6 +229,24 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
     * @return A usable topic to interact with Microcks mocks.
     */
    public String getMQTTMockTopic(String service, String version, String operationName) {
+      // operationName may start with SUBSCRIBE or PUBLISH.
+      if (operationName.contains(" ")) {
+         operationName = operationName.split(" ")[1];
+      }
+      return String.format(DESTINATION_PATTERN,
+            service.replace(" ", "").replace("-", ""),
+            version.replace(" ", ""),
+            operationName);
+   }
+
+   /**
+    * Get the exposed mock destination for a AMQP Service.
+    * @param service The name of Service/API
+    * @param version The version of Service/API
+    * @param operationName The name of operation to get the topic for
+    * @return A usable topic to interact with Microcks mocks.
+    */
+   public String getAMQPMockDestination(String service, String version, String operationName) {
       // operationName may start with SUBSCRIBE or PUBLISH.
       if (operationName.contains(" ")) {
          operationName = operationName.split(" ")[1];
