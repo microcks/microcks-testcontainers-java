@@ -16,6 +16,7 @@
 package io.github.microcks.testcontainers;
 
 import io.github.microcks.testcontainers.connection.AmazonServiceConnection;
+import io.github.microcks.testcontainers.connection.GenericConnection;
 import io.github.microcks.testcontainers.connection.KafkaConnection;
 
 import org.testcontainers.containers.GenericContainer;
@@ -32,6 +33,9 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
 
    private static final String MICROCKS_ASYNC_MINION_FULL_IMAGE_NAME = "quay.io/microcks/microcks-uber-async-minion";
    private static final DockerImageName MICROCKS_ASYNC_MINION_IMAGE = DockerImageName.parse(MICROCKS_ASYNC_MINION_FULL_IMAGE_NAME);
+
+   private static final String ASYNC_PROTOCOLS_ENV_VAR = "ASYNC_PROTOCOLS";
+   private static final String DESTINATION_PATTERN = "%s-%s-%s";
 
    public static final int MICROCKS_ASYNC_MINION_HTTP_PORT = 8081;
 
@@ -96,11 +100,27 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
     * @return self
     */
    public MicrocksAsyncMinionContainer withKafkaConnection(KafkaConnection connection) {
-      if (extraProtocols.indexOf(",KAFKA") == -1) {
+      if (!extraProtocols.contains(",KAFKA")) {
          extraProtocols += ",KAFKA";
       }
-      withEnv("ASYNC_PROTOCOLS", extraProtocols);
+      withEnv(ASYNC_PROTOCOLS_ENV_VAR, extraProtocols);
       withEnv("KAFKA_BOOTSTRAP_SERVER", connection.getBootstrapServers());
+      return this;
+   }
+
+   /**
+    * Connect the MicrocksAsyncMinionContainer to a MQTT server to allow MQTT messages mocking.
+    * @param connection Connection details to the MQTT server.
+    * @return self
+    */
+   public MicrocksAsyncMinionContainer withMQTTConnection(GenericConnection connection) {
+      if (!extraProtocols.contains(",MQTT")) {
+         extraProtocols += ",MQTT";
+      }
+      withEnv(ASYNC_PROTOCOLS_ENV_VAR, extraProtocols);
+      withEnv("MQTT_SERVER", connection.getServer());
+      withEnv("MQTT_USERNAME", connection.getUsername());
+      withEnv("MQTT_USERNAME", connection.getPassword());
       return this;
    }
 
@@ -110,10 +130,10 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
     * @return self
     */
    public MicrocksAsyncMinionContainer withAmazonSQSConnection(AmazonServiceConnection connection) {
-      if (extraProtocols.indexOf(",SQS") == -1) {
+      if (!extraProtocols.contains(",SQS")) {
          extraProtocols += ",SQS";
       }
-      withEnv("ASYNC_PROTOCOLS", extraProtocols);
+      withEnv(ASYNC_PROTOCOLS_ENV_VAR, extraProtocols);
       withEnv("AWS_SQS_REGION", connection.getRegion());
       withEnv("AWS_ACCESS_KEY_ID", connection.getAccessKey());
       withEnv("AWS_SECRET_ACCESS_KEY", connection.getSecretKey());
@@ -129,10 +149,10 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
     * @return self
     */
    public MicrocksAsyncMinionContainer withAmazonSNSConnection(AmazonServiceConnection connection) {
-      if (extraProtocols.indexOf(",SNS") == -1) {
+      if (!extraProtocols.contains(",SNS")) {
          extraProtocols += ",SNS";
       }
-      withEnv("ASYNC_PROTOCOLS", extraProtocols);
+      withEnv(ASYNC_PROTOCOLS_ENV_VAR, extraProtocols);
       withEnv("AWS_SNS_REGION", connection.getRegion());
       withEnv("AWS_ACCESS_KEY_ID", connection.getAccessKey());
       withEnv("AWS_SECRET_ACCESS_KEY", connection.getSecretKey());
@@ -159,7 +179,7 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
     */
    public String getWSMockEndpoint(String service, String version, String operationName) {
       // operationName may start with SUBSCRIBE or PUBLISH.
-      if (operationName.indexOf(" ") != -1) {
+      if (operationName.contains(" ")) {
          operationName = operationName.split(" ")[1];
       }
       return String.format("ws://%s:%s/api/ws/%s/%s/%s", getHost(), getMappedPort(MICROCKS_ASYNC_MINION_HTTP_PORT),
@@ -177,13 +197,31 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
     */
    public String getKafkaMockTopic(String service, String version, String operationName) {
       // operationName may start with SUBSCRIBE or PUBLISH.
-      if (operationName.indexOf(" ") != -1) {
+      if (operationName.contains(" ")) {
          operationName = operationName.split(" ")[1];
       }
-      return String.format("%s-%s-%s",
+      return String.format(DESTINATION_PATTERN,
             service.replace(" ", "").replace("-", ""),
             version,
             operationName.replace("/", "-"));
+   }
+
+   /**
+    * Get the exposed mock topic for a MQTT Service.
+    * @param service The name of Service/API
+    * @param version The version of Service/API
+    * @param operationName The name of operation to get the topic for
+    * @return A usable topic to interact with Microcks mocks.
+    */
+   public String getMQTTMockTopic(String service, String version, String operationName) {
+      // operationName may start with SUBSCRIBE or PUBLISH.
+      if (operationName.contains(" ")) {
+         operationName = operationName.split(" ")[1];
+      }
+      return String.format(DESTINATION_PATTERN,
+            service.replace(" ", "").replace("-", ""),
+            version.replace(" ", ""),
+            operationName);
    }
 
    /**
@@ -210,10 +248,10 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
 
    private String getAmazonServiceMockDestination(String service, String version, String operationName) {
       // operationName may start with SUBSCRIBE or PUBLISH.
-      if (operationName.indexOf(" ") != -1) {
+      if (operationName.contains(" ")) {
          operationName = operationName.split(" ")[1];
       }
-      return String.format("%s-%s-%s",
+      return String.format(DESTINATION_PATTERN,
             service.replace(" ", "").replace("-", ""),
             version.replace(".", ""),
             operationName.replace("/", "-"));

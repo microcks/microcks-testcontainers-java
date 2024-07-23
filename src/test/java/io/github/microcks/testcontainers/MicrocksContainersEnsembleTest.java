@@ -16,6 +16,7 @@
 package io.github.microcks.testcontainers;
 
 import io.github.microcks.testcontainers.connection.AmazonServiceConnection;
+import io.github.microcks.testcontainers.connection.GenericConnection;
 import io.github.microcks.testcontainers.connection.KafkaConnection;
 import io.github.microcks.testcontainers.model.Secret;
 import io.github.microcks.testcontainers.model.TestRequest;
@@ -23,6 +24,8 @@ import io.github.microcks.testcontainers.model.TestResult;
 import io.github.microcks.testcontainers.model.TestRunnerType;
 import io.github.microcks.testcontainers.model.TestStepResult;
 
+import com.hivemq.client.mqtt.mqtt3.Mqtt3BlockingClient;
+import com.hivemq.client.mqtt.mqtt3.Mqtt3Client;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -47,6 +50,7 @@ import org.testcontainers.containers.Network;
 import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.hivemq.HiveMQContainer;
 import org.testcontainers.utility.DockerImageName;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
@@ -61,6 +65,7 @@ import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -170,6 +175,26 @@ public class MicrocksContainersEnsembleTest {
          testMicrocksConfigRetrieval(ensemble.getMicrocksContainer().getHttpEndpoint());
 
          testMicrocksAsyncKafkaMockingFunctionality(ensemble, kafka);
+      }
+   }
+
+   @Test
+   public void testAsyncFeatureMQTTMockingFunctionality() throws Exception {
+      try (
+            MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(NATIVE_IMAGE)
+                  .withMainArtifacts("pastry-orders-asyncapi.yml")
+                  .withAsyncFeature()
+                  .withMQTTConnection(new GenericConnection("hivemq:1883", "test", "test"));
+
+            HiveMQContainer hivemq = new HiveMQContainer(DockerImageName.parse("hivemq/hivemq-ce:2024.3"))
+                  .withNetwork(ensemble.getNetwork())
+                  .withNetworkAliases("hivemq");
+      ) {
+         hivemq.start();
+         ensemble.start();
+         testMicrocksConfigRetrieval(ensemble.getMicrocksContainer().getHttpEndpoint());
+
+         testMicrocksAsyncMQTTMockingFunctionality(ensemble, hivemq);
       }
    }
 
@@ -402,7 +427,7 @@ public class MicrocksContainersEnsembleTest {
       String kafkaTopic = ensemble.getAsyncMinionContainer().getKafkaMockTopic("Pastry orders API", "0.1.0", "SUBSCRIBE pastry/orders");
       String expectedMessage = "{\"id\":\"4dab240d-7847-4e25-8ef3-1530687650c8\",\"customerId\":\"fe1088b3-9f30-4dc1-a93d-7b74f0a072b9\",\"status\":\"VALIDATED\",\"productQuantities\":[{\"quantity\":2,\"pastryName\":\"Croissant\"},{\"quantity\":1,\"pastryName\":\"Millefeuille\"}]}";
 
-      // Initialize Kafka producer to receive 1 message.
+      // Initialize Kafka consumer to receive 1 message.
       Properties props = new Properties();
       props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers().replace("PLAINTEXT://", ""));
       props.put(ConsumerConfig.GROUP_ID_CONFIG, "random-" + System.currentTimeMillis());
@@ -442,6 +467,41 @@ public class MicrocksContainersEnsembleTest {
       assertNotNull(message);
       assertTrue(message.length() > 1);
       assertEquals(expectedMessage, message);
+   }
+
+   private void testMicrocksAsyncMQTTMockingFunctionality(MicrocksContainersEnsemble ensemble, HiveMQContainer hivemq) {
+      // PastryordersAPI-0.1.0-pastry/orders
+      String mqttTopic = ensemble.getAsyncMinionContainer().getMQTTMockTopic("Pastry orders API", "0.1.0", "SUBSCRIBE pastry/orders");
+      String expectedMessage = "{\"id\":\"4dab240d-7847-4e25-8ef3-1530687650c8\",\"customerId\":\"fe1088b3-9f30-4dc1-a93d-7b74f0a072b9\",\"status\":\"VALIDATED\",\"productQuantities\":[{\"quantity\":2,\"pastryName\":\"Croissant\"},{\"quantity\":1,\"pastryName\":\"Millefeuille\"}]}";
+
+      // Initialize MQTT consumer to receive 1 message.
+      final Mqtt3BlockingClient client = Mqtt3Client.builder()
+            .serverHost(hivemq.getHost())
+            .serverPort(hivemq.getMqttPort())
+            .buildBlocking();
+
+      AtomicReference<String> message = new AtomicReference<>();
+
+      try {
+         client.connect();
+         client.toAsync().subscribeWith()
+               .topicFilter(mqttTopic)
+               .callback(publish -> {
+                  message.set(new String(publish.getPayloadAsBytes(), StandardCharsets.UTF_8));
+               })
+               .send();
+
+         Thread.sleep(4000L);
+      } catch (Exception e) {
+         fail("Exception while connecting to MQTT broker", e);
+      } finally {
+         client.disconnect();
+      }
+
+      // Compare messages.
+      assertNotNull(message.get());
+      assertTrue(message.get().length() > 1);
+      assertEquals(expectedMessage, message.get());
    }
 
    private void testMicrocksAsyncAmazonSQSMockingFunctionality(MicrocksContainersEnsemble ensemble, LocalStackContainer localstack) {

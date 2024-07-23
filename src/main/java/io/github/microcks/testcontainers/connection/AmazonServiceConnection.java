@@ -21,10 +21,10 @@ package io.github.microcks.testcontainers.connection;
  */
 public class AmazonServiceConnection {
 
-   private String region;
-   private String endpointOverride;
-   private String accessKey;
-   private String secretKey;
+   private final String region;
+   private final String endpointOverride;
+   private final String accessKey;
+   private final String secretKey;
 
    /**
     * Create a AmazonServiceConnection.
@@ -36,6 +36,7 @@ public class AmazonServiceConnection {
       this.region = region;
       this.accessKey = accessKey;
       this.secretKey = secretKey;
+      this.endpointOverride = null;
    }
 
    /**

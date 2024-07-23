@@ -21,7 +21,7 @@ package io.github.microcks.testcontainers.connection;
  */
 public class KafkaConnection {
 
-   private String bootstrapServers;
+   private final String bootstrapServers;
 
    /**
     * Create a KafkaConnection.

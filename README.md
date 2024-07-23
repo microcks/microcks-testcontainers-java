@@ -48,11 +48,11 @@ dependencies {
 
 You just have to specify the container image you'd like to use. This library requires a Microcks `uber` distribution (with no MongoDB dependency).
 
-Version `0.2.1` and above require version `1.8.1` of Microcks container images.
+Version `0.2.9` and above require version `1.10.0` of Microcks container images to enable MQTT and RabbitMQ support.
 
 ```java
 MicrocksContainer microcks = new MicrocksContainer(
-      DockerImageName.parse("quay.io/microcks/microcks-uber:1.9.0"));
+      DockerImageName.parse("quay.io/microcks/microcks-uber:1.9.1"));
 microcks.start();
 ```
 
@@ -79,8 +79,7 @@ microcks.importAsSecondaryArtifact(new File("target/test-classes/apipastries-pos
 
 Please refer to our [MicrocksContainerTest](https://github.com/microcks/microcks-testcontainers-java/blob/main/src/test/java/io/github/microcks/testcontainers/MicrocksContainerTest.java) for comprehensive example on how to use it.
 
-Starting with version `0.2.7` you can also import full 
-[repository snapshots](https://microcks.io/documentation/administrating/snapshots/) at once:
+You can also import full [repository snapshots](https://microcks.io/documentation/administrating/snapshots/) at once:
 
 ```java
 MicrocksContainer microcks = new MicrocksContainer(DockerImageName.parse("quay.io/microcks/microcks-uber:1.9.0"))

@@ -17,6 +17,9 @@ channels:
         sqs:
           queue:
             name: pastry-orders
+        mqtt:
+          qos: 0
+          retain: false
     bindings:
       ws:
         method: POST

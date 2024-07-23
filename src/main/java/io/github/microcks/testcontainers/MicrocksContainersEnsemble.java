@@ -16,6 +16,7 @@
 package io.github.microcks.testcontainers;
 
 import io.github.microcks.testcontainers.connection.AmazonServiceConnection;
+import io.github.microcks.testcontainers.connection.GenericConnection;
 import io.github.microcks.testcontainers.connection.KafkaConnection;
 import io.github.microcks.testcontainers.model.Secret;
 
@@ -127,6 +128,17 @@ public class MicrocksContainersEnsemble implements Startable {
    public MicrocksContainersEnsemble withKafkaConnection(KafkaConnection connection) {
       ensureAsyncFeatureIsEnabled();
       this.asyncMinion.withKafkaConnection(connection);
+      return this;
+   }
+
+   /**
+    * Once the Async Feature is enabled, connects to a MQTT broker.
+    * @param connection Connection details to a MQTT broker.
+    * @return self
+    */
+   public MicrocksContainersEnsemble withMQTTConnection(GenericConnection connection) {
+      ensureAsyncFeatureIsEnabled();
+      this.asyncMinion.withMQTTConnection(connection);
       return this;
    }
 
