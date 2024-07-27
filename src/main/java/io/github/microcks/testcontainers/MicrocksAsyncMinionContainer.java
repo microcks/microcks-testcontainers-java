@@ -119,7 +119,7 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
       withEnv(ASYNC_PROTOCOLS_ENV_VAR, extraProtocols);
       withEnv("MQTT_SERVER", connection.getServer());
       withEnv("MQTT_USERNAME", connection.getUsername());
-      withEnv("MQTT_USERNAME", connection.getPassword());
+      withEnv("MQTT_PASSWORD", connection.getPassword());
       return this;
    }
 
