@@ -22,6 +22,7 @@ Current development version is `0.2.9-SNAPSHOT`.
 [![Technical Debt](https://sonarcloud.io/api/project_badges/measure?project=microcks_microcks-testcontainers-java&metric=sqale_index)](https://sonarcloud.io/summary/new_code?id=microcks_microcks-testcontainers-java)
 [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=microcks_microcks-testcontainers-java&metric=security_rating)](https://sonarcloud.io/summary/new_code?id=microcks_microcks-testcontainers-java)
 [![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=microcks_microcks-testcontainers-java&metric=sqale_rating)](https://sonarcloud.io/summary/new_code?id=microcks_microcks-testcontainers-java)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fmicrocks%2Fmicrocks-testcontainers-java.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fmicrocks%2Fmicrocks-testcontainers-java?ref=badge_shield)
 
 ## How to use it?
 
@@ -265,3 +266,6 @@ CompletableFuture<TestResult> testResultFuture = ensemble.getMicrocksContainer()
 TestResult testResult = testResultFuture.get();
 assertTrue(testResult.isSuccess());
 ```
+
+## License
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fmicrocks%2Fmicrocks-testcontainers-java.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fmicrocks%2Fmicrocks-testcontainers-java?ref=badge_large)
