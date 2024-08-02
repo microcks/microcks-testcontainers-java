@@ -79,7 +79,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -94,7 +93,7 @@ import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
  */
 public class MicrocksContainersEnsembleTest {
 
-   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.9.0";
+   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.10.0";
 
    private static final String NATIVE_IMAGE = "quay.io/microcks/microcks-uber:nightly-native";
 

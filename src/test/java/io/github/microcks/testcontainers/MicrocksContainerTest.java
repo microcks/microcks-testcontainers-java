@@ -47,7 +47,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 public class MicrocksContainerTest {
 
-   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.9.0";
+   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.10.0";
    private static final DockerImageName MICROCKS_IMAGE = DockerImageName.parse(IMAGE);
 
    private static final DockerImageName BAD_PASTRY_IMAGE = DockerImageName.parse("quay.io/microcks/contract-testing-demo:01");
