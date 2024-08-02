@@ -2,15 +2,27 @@ name: build-verify-package
 on:
   push:
     paths-ignore:
+      - '.github/**'
       - '.gitignore'
+      - 'ADOPTERS*'
       - 'LICENSE'
       - 'README*'
+      - 'CHANGELOG*'
+      - 'ROADMAP*'
+      - 'SECURITY*'
+      - 'GOVERNANCE*'
   pull_request:
     paths-ignore:
       - '.github/**'
       - '.gitignore'
       - 'LICENSE'
       - 'README*'
+      - 'CHANGELOG*'
+      - 'ROADMAP*'
+      - 'SECURITY*'
+      - 'GOVERNANCE*'
+
+permissions: read-all
 
 jobs:
   build-verify-package:
