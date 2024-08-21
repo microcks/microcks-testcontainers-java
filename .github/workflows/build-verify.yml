@@ -11,6 +11,7 @@ on:
       - 'ROADMAP*'
       - 'SECURITY*'
       - 'GOVERNANCE*'
+      - 'CODE_OF_CONDUCT*'
   pull_request:
     paths-ignore:
       - '.github/**'
@@ -21,6 +22,7 @@ on:
       - 'ROADMAP*'
       - 'SECURITY*'
       - 'GOVERNANCE*'
+      - 'CODE_OF_CONDUCT*'
 
 permissions: read-all
 
