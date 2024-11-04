@@ -15,6 +15,8 @@
  */
 package io.github.microcks.testcontainers.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -26,6 +28,7 @@ import java.util.List;
  * how many times is has taken and so on ...
  * @author laurent
  */
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class TestResult {
 
    private String id;
@@ -41,6 +44,7 @@ public class TestResult {
    private boolean inProgress = true;
    private TestRunnerType runnerType;
    private OperationsHeaders operationsHeaders;
+   private OAuth2AuthorizedClient authorizedClient;
 
    private List<TestCaseResult> testCaseResults = new ArrayList<>();
 
@@ -154,5 +158,13 @@ public class TestResult {
 
    public void setTestCaseResults(List<TestCaseResult> testCaseResults) {
       this.testCaseResults = testCaseResults;
+   }
+
+   public OAuth2AuthorizedClient getAuthorizedClient() {
+      return authorizedClient;
+   }
+
+   public void setAuthorizedClient(OAuth2AuthorizedClient authorizedClient) {
+      this.authorizedClient = authorizedClient;
    }
 }

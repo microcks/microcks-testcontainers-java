@@ -15,6 +15,8 @@
  */
 package io.github.microcks.testcontainers.model;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +36,8 @@ public class TestRequest {
    private Long timeout = 5000L;
    private List<String> filteredOperations;
    private Map<String, List<Header>> operationsHeaders;
+   @JsonProperty("oAuth2Context")
+   private OAuth2ClientContext oAuth2Context;
 
    public String getServiceId() {
       return serviceId;
@@ -91,9 +95,17 @@ public class TestRequest {
       this.operationsHeaders = operationsHeaders;
    }
 
+   public OAuth2ClientContext getOAuth2Context() {
+      return oAuth2Context;
+   }
+
+   public void setOAuth2Context(OAuth2ClientContext oAuth2Context) {
+      this.oAuth2Context = oAuth2Context;
+   }
+
 
    /**
-    * Builder/Fluent API for creating TestRequestDTO instances.
+    * Builder/Fluent API for creating TestRequest instances.
     */
    public static class Builder {
       private String serviceId;
@@ -103,6 +115,7 @@ public class TestRequest {
       private Long timeout;
       private List<String> filteredOperations;
       private Map<String, List<Header>> operationsHeaders;
+      private OAuth2ClientContext oAuth2Context;
 
       public Builder serviceId(String serviceId) {
          this.serviceId = serviceId;
@@ -147,9 +160,14 @@ public class TestRequest {
          return this;
       }
 
+      public Builder oAuth2Context(OAuth2ClientContext oAuth2Context) {
+         this.oAuth2Context = oAuth2Context;
+         return this;
+      }
+
       /**
-       * Build a new TestRequestDTO instance after having initialized the different properties.
-       * @return A new TestRequestDTO instance
+       * Build a new TestRequest instance after having initialized the different properties.
+       * @return A new TestRequest instance
        */
       public TestRequest build() {
          // Build a request considering mandatory props are there.
@@ -169,6 +187,9 @@ public class TestRequest {
          }
          if (this.operationsHeaders != null) {
             request.setOperationsHeaders(this.operationsHeaders);
+         }
+         if (this.oAuth2Context != null) {
+            request.setOAuth2Context(this.oAuth2Context);
          }
          return request;
       }

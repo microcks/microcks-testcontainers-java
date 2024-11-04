@@ -16,10 +16,14 @@
 package io.github.microcks.testcontainers;
 
 import io.github.microcks.testcontainers.model.Header;
+import io.github.microcks.testcontainers.model.OAuth2ClientContext;
+import io.github.microcks.testcontainers.model.OAuth2GrantType;
 import io.github.microcks.testcontainers.model.Secret;
 import io.github.microcks.testcontainers.model.TestRequest;
 import io.github.microcks.testcontainers.model.TestResult;
 import io.github.microcks.testcontainers.model.TestRunnerType;
+
+import dasniko.testcontainers.keycloak.KeycloakContainer;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import org.junit.Test;
@@ -37,9 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * This is a test case for MicrocksContainer class.
@@ -94,6 +96,59 @@ public class MicrocksContainerTest {
 
          microcks.importAsMainArtifact(new File("target/test-classes/apipastries-openapi.yaml"));
          testMicrocksContractTestingFunctionality(microcks, badImpl, goodImpl);
+      }
+   }
+
+   @Test
+   public void testContractTestingFunctionalityWithOAuth2() throws Exception {
+      try (
+            Network network = Network.newNetwork();
+            MicrocksContainer microcks = new MicrocksContainer(MICROCKS_IMAGE)
+                  .withNetwork(network);
+            KeycloakContainer keycloak = new KeycloakContainer("quay.io/keycloak/keycloak:26.0.0")
+                  .withNetwork(network)
+                  .withNetworkAliases("keycloak")
+                  .withRealmImportFile("myrealm-realm.json");
+            GenericContainer<?> goodImpl = new GenericContainer<>(GOOD_PASTRY_IMAGE)
+                  .withNetwork(network)
+                  .withNetworkAliases("good-impl")
+                  .waitingFor(Wait.forLogMessage(".*Example app listening on port 3002.*", 1));
+
+      ) {
+         microcks.start();
+         keycloak.start();
+         goodImpl.start();
+         testMicrocksConfigRetrieval(microcks.getHttpEndpoint());
+
+         microcks.importAsMainArtifact(new File("target/test-classes/apipastries-openapi.yaml"));
+
+         // Issue a TestRequest with OAuth2 context.
+         TestRequest testRequest = new TestRequest.Builder()
+               .serviceId("API Pastries:0.0.1")
+               .runnerType(TestRunnerType.OPEN_API_SCHEMA.name())
+               .testEndpoint("http://good-impl:3002")
+               .timeout(2000L)
+               .oAuth2Context(new OAuth2ClientContext.Builder()
+                     .clientId("myrealm-serviceaccount")
+                     .clientSecret("ab54d329-e435-41ae-a900-ec6b3fe15c54")
+                     .tokenUri("http://keycloak:8080/realms/myrealm/protocol/openid-connect/token")
+                     .grantType(OAuth2GrantType.CLIENT_CREDENTIALS)
+                     .build())
+               .build();
+
+         TestResult testResult = microcks.testEndpoint(testRequest);
+
+         // Check test results.
+         assertTrue(testResult.isSuccess());
+         assertEquals("http://good-impl:3002", testResult.getTestedEndpoint());
+         assertEquals(3, testResult.getTestCaseResults().size());
+         assertEquals("", testResult.getTestCaseResults().get(0).getTestStepResults().get(0).getMessage());
+
+         // Ensure test has used a valid OAuth2 client.
+         assertNotNull(testResult.getAuthorizedClient());
+         assertEquals("myrealm-serviceaccount", testResult.getAuthorizedClient().getPrincipalName());
+         assertEquals("http://keycloak:8080/realms/myrealm/protocol/openid-connect/token", testResult.getAuthorizedClient().getTokenUri());
+         assertEquals("openid profile email", testResult.getAuthorizedClient().getScopes());
       }
    }
 
