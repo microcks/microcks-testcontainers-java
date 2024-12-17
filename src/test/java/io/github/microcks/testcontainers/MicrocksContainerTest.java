@@ -18,11 +18,13 @@ package io.github.microcks.testcontainers;
 import io.github.microcks.testcontainers.model.Header;
 import io.github.microcks.testcontainers.model.OAuth2ClientContext;
 import io.github.microcks.testcontainers.model.OAuth2GrantType;
+import io.github.microcks.testcontainers.model.RequestResponsePair;
 import io.github.microcks.testcontainers.model.Secret;
 import io.github.microcks.testcontainers.model.TestRequest;
 import io.github.microcks.testcontainers.model.TestResult;
 import io.github.microcks.testcontainers.model.TestRunnerType;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import dasniko.testcontainers.keycloak.KeycloakContainer;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
@@ -30,6 +32,7 @@ import org.junit.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 import org.testcontainers.utility.DockerImageName;
 
 import java.io.File;
@@ -260,16 +263,28 @@ public class MicrocksContainerTest {
       // First test should fail with validation failure messages.
       TestResult testResult = microcks.testEndpoint(testRequest);
 
-      /*
       System.err.println(microcks.getLogs());
       ObjectMapper mapper = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
       System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(testResult));
-      */
 
       assertFalse(testResult.isSuccess());
       assertEquals("http://bad-impl:3001", testResult.getTestedEndpoint());
       assertEquals(3, testResult.getTestCaseResults().size());
       assertTrue(testResult.getTestCaseResults().get(0).getTestStepResults().get(0).getMessage().contains("object has missing required properties"));
+
+      // Retrieve messages for the failing test case.
+      List<RequestResponsePair> messages = microcks.getMessagesForTestCase(testResult, "GET /pastries");
+      assertEquals(3, messages.size());
+      for (RequestResponsePair message : messages) {
+         // Check there is some response.
+         assertNotNull(message.getRequest());
+         assertNotNull(message.getResponse());
+         assertNotNull(message.getResponse().getContent());
+         // Check these are the correct requests.
+         assertNotNull(message.getRequest().getQueryParameters());
+         assertEquals(1, message.getRequest().getQueryParameters().size());
+         assertEquals("size", message.getRequest().getQueryParameters().get(0).getName());
+      }
 
       // Switch endpoint to the correct implementation.
       // Other way of doing things via builder and fluent api.

@@ -15,9 +15,11 @@
  */
 package io.github.microcks.testcontainers;
 
+import io.github.microcks.testcontainers.model.RequestResponsePair;
 import io.github.microcks.testcontainers.model.Secret;
 import io.github.microcks.testcontainers.model.TestResult;
 import io.github.microcks.testcontainers.model.TestRequest;
+import io.github.microcks.testcontainers.model.UnidirectionalEvent;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.github.dockerjava.api.command.InspectContainerResponse;
@@ -44,9 +46,11 @@ import java.io.PrintWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -455,6 +459,109 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       throw new MicrocksException("Couldn't launch on new test on Microcks. Please check Microcks container logs");
    }
 
+
+   /**
+    * Retrieve messages exchanged during a test on an endpoint (for further investigation or checks).
+    * @param testResult The TestResult to get messages for
+    * @param operationName The name of the operation to get messages corresponding to test case
+    * @return The list of RequestResponsePair representing messages exchanged during test case
+    * @throws IOException If connection to Microcks container failed (no route to host, low-level network stuffs)
+    * @throws MicrocksException If Microcks fails retrieving the messages
+    */
+   public List<RequestResponsePair> getMessagesForTestCase(TestResult testResult, String operationName) throws IOException, MicrocksException {
+      return getMessagesForTestCase(getHttpEndpoint(), testResult, operationName);
+   }
+
+   /**
+    * Retrieve messages exchanged during a test on an endpoint. This may be a fallback to non-static {@code getMessagesForTestCase(TestResult testResult, String operationName)}
+    * method if you don't have direct access to the MicrocksContainer instance you want to get messages from.
+    * @param microcksContainerHttpEndpoint The Http endpoint where to reach running MicrocksContainer
+    * @param testResult The TestResult to get messages for
+    * @param operationName The name of the operation to get messages corresponding to test case
+    * @return The list of RequestResponsePair representing messages exchanged during test case
+    * @throws IOException If connection to Microcks container failed (no route to host, low-level network stuffs)
+    * @throws MicrocksException If Microcks fails retrieving the messages
+    */
+   public static List<RequestResponsePair> getMessagesForTestCase(String microcksContainerHttpEndpoint, TestResult testResult, String operationName)
+         throws IOException, MicrocksException {
+
+      // Build the testCase unique identifier.
+      String operation = operationName.replace('/', '!');
+      String testCaseId = testResult.getId() + "-" + testResult.getTestNumber() + "-" + URLEncoder.encode(operation);
+
+      URL url = new URL(microcksContainerHttpEndpoint + "/api/tests/" + testResult.getId() + "/messages/" + testCaseId);
+      HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
+      httpConn.setRequestMethod("GET");
+      httpConn.setRequestProperty(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON.getMediaType());
+      httpConn.setDoOutput(false);
+
+      if (httpConn.getResponseCode() == 200) {
+         // Read response content and disconnect Http connection.
+         StringBuilder responseContent = getResponseContent(httpConn);
+         httpConn.disconnect();
+
+         // Unmarshal and return result.
+         return getMapper().readValue(responseContent.toString(),
+               mapper.getTypeFactory().constructCollectionType(List.class, RequestResponsePair.class));
+      }
+      if (log.isErrorEnabled()) {
+         log.error("Couldn't retrieve messages status {} ", httpConn.getResponseCode());
+      }
+      httpConn.disconnect();
+      throw new MicrocksException("Couldn't retrieve messages on test on Microcks. Please check Microcks container logs");
+   }
+
+   /**
+    * Retrieve event messages received during a test on an endpoint (for further investigation or checks).
+    * @param testResult The TestResult to get event messages for
+    * @param operationName The name of the operation to get event messages corresponding to test case
+    * @return The list of UnidirectionalEvent representing events received during test case
+    * @throws IOException If connection to Microcks container failed (no route to host, low-level network stuffs)
+    * @throws MicrocksException If Microcks fails retrieving the messages
+    */
+   public List<UnidirectionalEvent> getEventMessagesForTestCase(TestResult testResult, String operationName) throws IOException, MicrocksException {
+      return getEventMessagesForTestCase(getHttpEndpoint(), testResult, operationName);
+   }
+
+   /**
+    * Retrieve event messages received during a test on an endpoint. This may be a fallback to non-static {@code getEventMessagesForTestCase(TestResult testResult, String operationName)}
+    * method if you don't have direct access to the MicrocksContainer instance you want to get messages from.
+    * @param microcksContainerHttpEndpoint The Http endpoint where to reach running MicrocksContainer
+    * @param testResult The TestResult to get event messages for
+    * @param operationName The name of the operation to get event messages corresponding to test case
+    * @return The list of UnidirectionalEvent representing events received during test case
+    * @throws IOException If connection to Microcks container failed (no route to host, low-level network stuffs)
+    * @throws MicrocksException If Microcks fails retrieving the event messages
+    */
+   public static List<UnidirectionalEvent> getEventMessagesForTestCase(String microcksContainerHttpEndpoint, TestResult testResult, String operationName)
+         throws IOException, MicrocksException {
+
+      // Build the testCase unique identifier.
+      String operation = operationName.replace('/', '!');
+      String testCaseId = testResult.getId() + "-" + testResult.getTestNumber() + "-" + URLEncoder.encode(operation);
+
+      URL url = new URL(microcksContainerHttpEndpoint + "/api/tests/" + testResult.getId() + "/events/" + testCaseId);
+      HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
+      httpConn.setRequestMethod("GET");
+      httpConn.setRequestProperty(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON.getMediaType());
+      httpConn.setDoOutput(false);
+
+      if (httpConn.getResponseCode() == 200) {
+         // Read response content and disconnect Http connection.
+         StringBuilder responseContent = getResponseContent(httpConn);
+         httpConn.disconnect();
+
+         // Unmarshal and return result.
+         return getMapper().readValue(responseContent.toString(),
+               mapper.getTypeFactory().constructCollectionType(List.class, UnidirectionalEvent.class));
+      }
+      if (log.isErrorEnabled()) {
+         log.error("Couldn't retrieve messages status {} ", httpConn.getResponseCode());
+      }
+      httpConn.disconnect();
+      throw new MicrocksException("Couldn't retrieve messages on test on Microcks. Please check Microcks container logs");
+   }
+
    /**
     * Download a remote artifact as a primary or main one within the Microcks container.
     * @param remoteArtifactUrl The URL to remote artifact (OpenAPI, Postman collection, Protobuf, GraphQL schema, ...)
@@ -598,6 +705,17 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          mapper.setPropertyInclusion(JsonInclude.Value.construct(JsonInclude.Include.NON_NULL, JsonInclude.Include.NON_NULL));
       }
       return mapper;
+   }
+
+   private static StringBuilder getResponseContent(HttpURLConnection httpConn) throws IOException {
+      StringBuilder responseContent = new StringBuilder();
+      try (BufferedReader br = new BufferedReader(new InputStreamReader(httpConn.getInputStream(), StandardCharsets.UTF_8))) {
+         String responseLine;
+         while ((responseLine = br.readLine()) != null) {
+            responseContent.append(responseLine.trim());
+         }
+      }
+      return responseContent;
    }
 
    private static HttpURLConnection uploadFileToMicrocks(URL microcksApiURL, File file, String contentType) throws IOException {

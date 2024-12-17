@@ -23,6 +23,7 @@ import io.github.microcks.testcontainers.model.TestRequest;
 import io.github.microcks.testcontainers.model.TestResult;
 import io.github.microcks.testcontainers.model.TestRunnerType;
 import io.github.microcks.testcontainers.model.TestStepResult;
+import io.github.microcks.testcontainers.model.UnidirectionalEvent;
 
 import com.hivemq.client.mqtt.mqtt3.Mqtt3BlockingClient;
 import com.hivemq.client.mqtt.mqtt3.Mqtt3Client;
@@ -766,6 +767,17 @@ public class MicrocksContainersEnsembleTest {
       assertFalse(testResult.getTestCaseResults().get(0).getTestStepResults().isEmpty());
       TestStepResult testStepResult = testResult.getTestCaseResults().get(0).getTestStepResults().get(0);
       assertTrue(testStepResult.getMessage().contains("object has missing required properties ([\"status\"]"));
+
+      // Retrieve event messages for the failing test case.
+      List<UnidirectionalEvent> events = ensemble.getMicrocksContainer().getEventMessagesForTestCase(testResult,
+            "SUBSCRIBE pastry/orders");
+      // We should have at least 4 events.
+      assertTrue(events.size() >= 4);
+      for (UnidirectionalEvent event : events) {
+         assertNotNull(event.getEventMessage());
+         // Check these are the correct message.
+         assertEquals(badMessage, event.getEventMessage().getContent());
+      }
 
       // Switch endpoint to the correct implementation.
       // Other way of doing things via builder and fluent api.
