@@ -85,7 +85,7 @@ Artifacts can be imported as main/Primary ones or as secondary ones. See [Multi-
 You can do it before starting the container using simple paths:
 
 ```java
-MicrocksContainer microcks = new MicrocksContainer(DockerImageName.parse("quay.io/microcks/microcks-uber:1.9.0"))
+MicrocksContainer microcks = new MicrocksContainer(DockerImageName.parse("quay.io/microcks/microcks-uber:1.10.0"))
     .withMainArtifacts("apipastries-openapi.yaml")
     .withSecondaryArtifacts("apipastries-postman-collection.json");
 microcks.start();
@@ -153,6 +153,8 @@ public void testOpenAPIContract() throws Exception {
 ```
 
 The `TestResult` gives you access to all details regarding success of failure on different test cases.
+
+In addition, you can use the `getMessagesForTestCase()` method to retrieve the messages exchanged during the test.
 
 A comprehensive Spring Boot demo application illustrating both usages is available here: [spring-boot-order-service](https://github.com/microcks/api-lifecycle/tree/master/shift-left-demo/spring-boot-order-service).
 
@@ -286,3 +288,5 @@ CompletableFuture<TestResult> testResultFuture = ensemble.getMicrocksContainer()
 TestResult testResult = testResultFuture.get();
 assertTrue(testResult.isSuccess());
 ```
+
+In addition, you can use the `getEventMessagesForTestCase()` method to retrieve the events received during the test.

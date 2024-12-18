@@ -309,15 +309,8 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       HttpURLConnection httpConn = uploadFileToMicrocks(url, artifact, "application/octet-stream");
 
       if (httpConn.getResponseCode() != 201) {
-         // Read response content for diagnostic purpose.
-         StringBuilder responseContent = new StringBuilder();
-         try (BufferedReader br = new BufferedReader(new InputStreamReader(httpConn.getInputStream(), StandardCharsets.UTF_8))) {
-            String responseLine = null;
-            while ((responseLine = br.readLine()) != null) {
-               responseContent.append(responseLine.trim());
-            }
-         }
-         // Disconnect Http connection.
+         // Read response content for diagnostic purpose and disconnect.
+         StringBuilder responseContent = getResponseContent(httpConn);
          httpConn.disconnect();
 
          log.error("Artifact has not been correctly imported: {}", responseContent);
@@ -345,15 +338,8 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       HttpURLConnection httpConn = uploadFileToMicrocks(url, snapshot, "application/json");
 
       if (httpConn.getResponseCode() != 201) {
-         // Read response content for diagnostic purpose.
-         StringBuilder responseContent = new StringBuilder();
-         try (BufferedReader br = new BufferedReader(new InputStreamReader(httpConn.getInputStream(), StandardCharsets.UTF_8))) {
-            String responseLine = null;
-            while ((responseLine = br.readLine()) != null) {
-               responseContent.append(responseLine.trim());
-            }
-         }
-         // Disconnect Http connection.
+         // Read response content for diagnostic purpose and disconnect.
+         StringBuilder responseContent = getResponseContent(httpConn);
          httpConn.disconnect();
 
          log.error("Snapshot has not been correctly imported: {}", responseContent);
@@ -423,13 +409,8 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          os.write(input, 0, input.length);
       }
 
-      StringBuilder responseContent = new StringBuilder();
-      try (BufferedReader br = new BufferedReader(new InputStreamReader(httpConn.getInputStream(), StandardCharsets.UTF_8))) {
-         String responseLine;
-         while ((responseLine = br.readLine()) != null) {
-            responseContent.append(responseLine.trim());
-         }
-      }
+      // Read response content.
+      StringBuilder responseContent = getResponseContent(httpConn);
 
       if (httpConn.getResponseCode() == 201) {
          httpConn.disconnect();
@@ -618,15 +599,8 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          }
 
          if (httpConn.getResponseCode() != 201) {
-            // Read response content for diagnostic purpose.
-            StringBuilder responseContent = new StringBuilder();
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(httpConn.getInputStream(), StandardCharsets.UTF_8))) {
-               String responseLine = null;
-               while ((responseLine = br.readLine()) != null) {
-                  responseContent.append(responseLine.trim());
-               }
-            }
-            // Disconnect Http connection.
+            // Read response content for diagnostic purpose and disconnect.
+            StringBuilder responseContent = getResponseContent(httpConn);
             httpConn.disconnect();
 
             log.error("Artifact has not been correctly downloaded: {}", responseContent);
@@ -675,15 +649,8 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          }
 
          if (httpConn.getResponseCode() != 201) {
-            // Read response content for diagnostic purpose.
-            StringBuilder responseContent = new StringBuilder();
-            try (BufferedReader br = new BufferedReader(new InputStreamReader(httpConn.getInputStream(), StandardCharsets.UTF_8))) {
-               String responseLine = null;
-               while ((responseLine = br.readLine()) != null) {
-                  responseContent.append(responseLine.trim());
-               }
-            }
-            // Disconnect Http connection.
+            // Read response content for diagnostic purpose and disconnect.
+            StringBuilder responseContent = getResponseContent(httpConn);
             httpConn.disconnect();
 
             log.error("Secret has not been correctly created: {}", responseContent);
