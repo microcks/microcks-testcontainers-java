@@ -1,0 +1,60 @@
+project:
+  name: Microcks Testcontainers
+  description: Microcks Testcontainers Java library
+  longDescription: Microcks Testcontainers Java library
+  copyright: The Microcks Authors
+  java:
+    version: 8
+
+signing:
+  active: ALWAYS
+  armored: true
+
+assemble:
+  archive:
+    microcks-quarkus:
+      active: ALWAYS
+      stereotype: NONE
+      options:
+        longFileMode: POSIX
+      formats:
+        - ZIP
+        - TGZ
+      fileSets:
+        - input: target/staging-deploy
+          includes:
+            - '**/*.*'
+
+files:
+  active: ALWAYS
+  artifacts:
+    - path: 'target/site/microcks-testcontainers-{{projectVersion}}.spdx-sbom.json'
+
+deploy:
+  maven:
+    nexus2:
+      sonatype:
+        active: ALWAYS
+        snapshotSupported: false
+        url: https://oss.sonatype.org/service/local
+        snapshotUrl: https://oss.sonatype.org/content/repositories/snapshots
+        stagingProfileId: c3fae58a8dda9
+        closeRepository: false
+        releaseRepository: false
+        stagingRepositories:
+          - target/staging-deploy
+    pomchecker:
+      failOnWarning: false
+      failOnError: false
+      strict: false
+
+release:
+  github:
+    overwrite: true
+    releaseName: '{{tagName}}'
+    tagName: '{{projectVersion}}'
+    changelog:
+      formatted: ALWAYS
+      preset: conventional-commits
+      contributors:
+        format: '- {{contributorName}}{{#contributorUsernameAsLink}} ({{.}}){{/contributorUsernameAsLink}}'
