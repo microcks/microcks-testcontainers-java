@@ -28,6 +28,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import dasniko.testcontainers.keycloak.KeycloakContainer;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
+import org.apache.commons.lang3.time.DateUtils;
 import org.junit.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
@@ -39,6 +40,7 @@ import java.io.File;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -222,6 +224,9 @@ public class MicrocksContainerTest {
    private void testMicrocksMockingFunctionality(MicrocksContainer microcks) {
       String baseApiUrl = microcks.getRestMockEndpoint("API Pastries", "0.0.1");
 
+      assertFalse(microcks.verify("API Pastries", "0.0.1"));
+      assertEquals(0, microcks.getServiceInvocationsCount("API Pastries", "0.0.1"));
+
       // Check that mock from main/primary artifact has been loaded.
       Response millefeuille = RestAssured.given().when()
             .get(baseApiUrl + "/pastries/Millefeuille")
@@ -231,6 +236,8 @@ public class MicrocksContainerTest {
       assertEquals("Millefeuille", millefeuille.jsonPath().get("name"));
       //millefeuille.getBody().prettyPrint();
 
+      testMicrocksInvocationsCheckingFunctionality(microcks, "API Pastries", "0.0.1", 1L);
+
       // Check that mock from secondary artifact has been loaded.
       Response eclairChocolat = RestAssured.given().when()
             .get(baseApiUrl + "/pastries/Eclair Chocolat")
@@ -239,6 +246,8 @@ public class MicrocksContainerTest {
       assertEquals(200, eclairChocolat.getStatusCode());
       assertEquals("Eclair Chocolat", eclairChocolat.jsonPath().get("name"));
       //eclairChocolat.getBody().prettyPrint();
+
+      testMicrocksInvocationsCheckingFunctionality(microcks, "API Pastries", "0.0.1", 2L);
 
       // Check that mock from main/primary remote artifact has been loaded.
       baseApiUrl = microcks.getRestMockEndpoint("API Pastry - 2.0", "2.0.0");
@@ -250,6 +259,27 @@ public class MicrocksContainerTest {
       assertEquals(200, millefeuille.getStatusCode());
       assertEquals("Millefeuille", millefeuille.jsonPath().get("name"));
       //millefeuille.getBody().prettyPrint();
+
+      testMicrocksInvocationsCheckingFunctionality(microcks, "API Pastry - 2.0", "2.0.0", 1L);
+   }
+
+   private static void testMicrocksInvocationsCheckingFunctionality(MicrocksContainer microcks, String serviceName, String serviceVersion, Long expectedOccurences) {
+      Date invocationDay = new Date();
+      Date incorrectInvocationDay = DateUtils.addDays(invocationDay, 1);
+
+      assertTrue(microcks.verify(serviceName, serviceVersion));
+      assertTrue(microcks.verify(serviceName, serviceVersion, (Date) null));
+      assertTrue(microcks.verify(serviceName, serviceVersion, invocationDay));
+      assertTrue(MicrocksContainer.verify(microcks.getHttpEndpoint(), serviceName, serviceVersion, invocationDay));
+      assertFalse(microcks.verify(serviceName, serviceVersion, incorrectInvocationDay));
+      assertFalse(MicrocksContainer.verify(microcks.getHttpEndpoint(), serviceName, serviceVersion, incorrectInvocationDay));
+
+      assertEquals(expectedOccurences, microcks.getServiceInvocationsCount(serviceName, serviceVersion));
+      assertEquals(expectedOccurences, microcks.getServiceInvocationsCount(serviceName, serviceVersion, (Date) null));
+      assertEquals(expectedOccurences, microcks.getServiceInvocationsCount(serviceName, serviceVersion, invocationDay));
+      assertEquals(expectedOccurences, MicrocksContainer.getServiceInvocationsCount(microcks.getHttpEndpoint(), serviceName, serviceVersion, invocationDay));
+      assertEquals(0, microcks.getServiceInvocationsCount(serviceName, serviceVersion, incorrectInvocationDay));
+      assertEquals(0, MicrocksContainer.getServiceInvocationsCount(microcks.getHttpEndpoint(), serviceName, serviceVersion, incorrectInvocationDay));
    }
 
    private void testMicrocksContractTestingFunctionality(MicrocksContainer microcks, GenericContainer badImpl, GenericContainer goodImpl) throws Exception {
