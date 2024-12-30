@@ -28,7 +28,7 @@ assemble:
 files:
   active: ALWAYS
   artifacts:
-    - path: 'target/site/microcks-testcontainers-java-{{projectVersion}}.spdx-sbom.json'
+    - path: 'target/site/microcks-testcontainers-{{projectVersion}}.spdx-sbom.json'
 
 deploy:
   maven:
