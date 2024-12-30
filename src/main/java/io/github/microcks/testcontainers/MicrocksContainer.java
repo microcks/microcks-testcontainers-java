@@ -15,6 +15,7 @@
  */
 package io.github.microcks.testcontainers;
 
+import io.github.microcks.testcontainers.model.DailyInvocationStatistic;
 import io.github.microcks.testcontainers.model.RequestResponsePair;
 import io.github.microcks.testcontainers.model.Secret;
 import io.github.microcks.testcontainers.model.TestResult;
@@ -30,6 +31,7 @@ import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 import org.testcontainers.shaded.com.github.dockerjava.core.MediaType;
 import org.testcontainers.shaded.com.google.common.net.HttpHeaders;
+import org.testcontainers.shaded.com.google.common.net.UrlEscapers;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 import org.testcontainers.shaded.org.awaitility.core.ConditionTimeoutException;
 import org.testcontainers.utility.DockerImageName;
@@ -43,12 +45,15 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.math.BigDecimal;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -74,6 +79,8 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    public static final int MICROCKS_GRPC_PORT = 9090;
 
    private static ObjectMapper mapper;
+
+   private static SimpleDateFormat metricsApiDayFormatter = new SimpleDateFormat("yyyyMMdd");
 
    private Set<String> snapshotsToImport;
    private Set<String> mainArtifactsToImport;
@@ -561,6 +568,167 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       downloadArtifact(remoteArtifactUrl, false);
    }
 
+   /**
+    * Verifies that given Service has been invoked at least one time, for the current invocations' date.
+    *
+    * @param serviceName    mandatory
+    * @param serviceVersion mandatory
+    * @return false if the given service was not found, or if the daily invocation's count is zero. Else, returns true if the daily invocations' count for the given service is at least one.
+    */
+   public boolean verify(String serviceName, String serviceVersion) {
+      return doVerify(getHttpEndpoint(), serviceName, serviceVersion, null);
+   }
+
+   /**
+    * Verifies that given Service has been invoked at least one time, for the current invocations' date.
+    *
+    * @param microcksContainerHttpEndpoint mandatory
+    * @param serviceName                   mandatory
+    * @param serviceVersion                mandatory
+    * @return false if the given service was not found, or if the daily invocation's count is zero. Else, returns true if the daily invocations' count for the given service is at least one.
+    */
+   public static boolean verify(String microcksContainerHttpEndpoint, String serviceName, String serviceVersion) {
+      return doVerify(microcksContainerHttpEndpoint, serviceName, serviceVersion, null);
+   }
+
+   /**
+    * Verifies that given Service has been invoked at least one time, for the given invocations' date.
+    * In unit testing context, it should be useless to pass the invocations date, prefer calling {@link #verify(String, String)}`.
+    *
+    * @param serviceName     mandatory
+    * @param serviceVersion  mandatory
+    * @param invocationsDate nullable
+    * @return false if the given service was not found, or if the daily invocation's count is zero. Else, returns true if the daily invocations' count for the given service is at least one.
+    */
+   public boolean verify(String serviceName, String serviceVersion, Date invocationsDate) {
+      return doVerify(getHttpEndpoint(), serviceName, serviceVersion, invocationsDate);
+   }
+
+   /**
+    * Verifies that given Service has been invoked at least one time, for the given invocations' date.
+    * In unit testing context, it should be useless to pass the invocations date, prefer calling {@link #verify(String, String)}`.
+    *
+    * @param microcksContainerHttpEndpoint mandatory
+    * @param serviceName                   mandatory
+    * @param serviceVersion                mandatory
+    * @param invocationsDate               nullable
+    * @return false if the given service was not found, or if the daily invocation's count is zero. Else, returns true if the daily invocations' count for the given service is at least one.
+    */
+   public static boolean verify(String microcksContainerHttpEndpoint, String serviceName, String serviceVersion, Date invocationsDate) {
+      return doVerify(microcksContainerHttpEndpoint, serviceName, serviceVersion, invocationsDate);
+   }
+
+   private static boolean doVerify(String microcksContainerHttpEndpoint, String serviceName, String serviceVersion, Date invocationsDate) {
+      DailyInvocationStatistic dailyInvocationStatistic = getServiceInvocations(microcksContainerHttpEndpoint, serviceName, serviceVersion, invocationsDate);
+
+      if (dailyInvocationStatistic == null) {
+         return false;
+      }
+
+      BigDecimal count = dailyInvocationStatistic.getDailyCount();
+
+      return count != null && count.intValue() != 0;
+   }
+
+   /**
+    * Get the invocations' count for a given service, identified by its name and version, for the current invocations' date.
+    *
+    * @param serviceName    mandatory
+    * @param serviceVersion mandatory
+    * @return zero if the given service was not found, or has never been invoked. Else, returns the daily count of invocations for the given service.
+    */
+   public Long getServiceInvocationsCount(String serviceName, String serviceVersion) {
+      return doGetServiceInvocationsCount(getHttpEndpoint(), serviceName, serviceVersion, null);
+   }
+
+   /**
+    * Get the invocations' count for a given service, identified by its name and version, for the current invocations' date.
+    *
+    * @param microcksContainerHttpEndpoint mandatory
+    * @param serviceName                   mandatory
+    * @param serviceVersion                mandatory
+    * @return zero if the given service was not found, or has never been invoked. Else, returns the daily count of invocations for the given service.
+    */
+   public static Long getServiceInvocationsCount(String microcksContainerHttpEndpoint, String serviceName, String serviceVersion) {
+      return doGetServiceInvocationsCount(microcksContainerHttpEndpoint, serviceName, serviceVersion, null);
+   }
+
+   /**
+    * Get the invocations' count for a given service, identified by its name and version, for the given invocations' date.
+    * In unit testing context, it should be useless to pass the invocations date, prefer calling {@link #getServiceInvocationsCount(String, String)}`.
+    *
+    * @param serviceName     mandatory
+    * @param serviceVersion  mandatory
+    * @param invocationsDate nullable
+    * @return zero if the given service was not found, or has never been invoked. Else, returns the daily count of invocations for the given service.
+    */
+   public Long getServiceInvocationsCount(String serviceName, String serviceVersion, Date invocationsDate) {
+      return doGetServiceInvocationsCount(getHttpEndpoint(), serviceName, serviceVersion, invocationsDate);
+   }
+
+   /**
+    * Get the invocations' count for a given service, identified by its name and version, for the given invocations' date.
+    * In unit testing context, it should be useless to pass the invocations date, prefer calling {@link #getServiceInvocationsCount(String, String)}`.
+    *
+    * @param microcksContainerHttpEndpoint mandatory
+    * @param serviceName                   mandatory
+    * @param serviceVersion                mandatory
+    * @param invocationsDate               nullable
+    * @return zero if the given service was not found, or has never been invoked. Else, returns the daily count of invocations for the given service.
+    */
+   public static Long getServiceInvocationsCount(String microcksContainerHttpEndpoint, String serviceName, String serviceVersion, Date invocationsDate) {
+      return doGetServiceInvocationsCount(microcksContainerHttpEndpoint, serviceName, serviceVersion, invocationsDate);
+   }
+
+   private static Long doGetServiceInvocationsCount(String microcksContainerHttpEndpoint, String serviceName, String serviceVersion, Date invocationsDate) {
+      DailyInvocationStatistic dailyInvocationStatistic = getServiceInvocations(microcksContainerHttpEndpoint, serviceName, serviceVersion, invocationsDate);
+
+      if (dailyInvocationStatistic == null) {
+         return 0L;
+      }
+
+      BigDecimal count = dailyInvocationStatistic.getDailyCount();
+
+      return count.longValue();
+   }
+
+
+   /**
+    * Returns all data from Microcks Metrics REST API about the invocations of a given service.
+    *
+    * @param microcksContainerHttpEndpoint mandatory
+    * @param serviceName                   mandatory
+    * @param serviceVersion                mandatory
+    * @param invocationsDate               nullable
+    * @return
+    */
+   private static DailyInvocationStatistic getServiceInvocations(String microcksContainerHttpEndpoint, String serviceName, String serviceVersion, Date invocationsDate) {
+      String encodedServiceName = UrlEscapers.urlFragmentEscaper().escape(serviceName);
+      String encodedServiceVersion = UrlEscapers.urlFragmentEscaper().escape(serviceVersion);
+
+      String restApiURL = String.format("%s/api/metrics/invocations/%s/%s", microcksContainerHttpEndpoint, encodedServiceName, encodedServiceVersion);
+
+      if (invocationsDate != null) {
+         restApiURL += "?day=" + metricsApiDayFormatter.format(invocationsDate);
+      }
+
+      try {
+         Thread.sleep(100); // to avoid race condition issue when requesting Microcks Metrics REST API
+      } catch (InterruptedException e) {
+         log.warn("Failed to sleep before calling Microcks API", e);
+         Thread.currentThread().interrupt();
+      }
+
+      try {
+         StringBuilder content = getFromRestApi(restApiURL);
+         return content.length() == 0 ? null : getMapper().readValue(content.toString(), DailyInvocationStatistic.class);
+      } catch (IOException e) {
+         log.warn("Failed to get service's invocations at address " + restApiURL, e);
+      }
+
+      return null;
+   }
+
    private void importArtifact(String artifactPath, boolean mainArtifact) {
       URL resource = Thread.currentThread().getContextClassLoader().getResource(artifactPath);
       if (resource == null) {
@@ -727,8 +895,21 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    }
 
    private static TestResult refreshTestResult(String microcksContainerHttpEndpoint, String testResultId) throws IOException {
+      StringBuilder content = getFromRestApi(microcksContainerHttpEndpoint + "/api/tests/" + testResultId);
+
+      return getMapper().readValue(content.toString(), TestResult.class);
+   }
+
+   /**
+    * Does a GET HTTP call to Microcks REST API and expecting to obtain a 200 response with a `application/json` body: returns it as a StringBuilder.
+    *
+    * @param restApiURL mandatory
+    * @return
+    * @throws IOException
+    */
+   private static StringBuilder getFromRestApi(String restApiURL) throws IOException {
       // Build a new client on correct API endpoint.
-      URL url = new URL(microcksContainerHttpEndpoint + "/api/tests/" + testResultId);
+      URL url = new URL(restApiURL);
       HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
       httpConn.setRequestMethod("GET");
       httpConn.setRequestProperty("Accept", "application/json");
@@ -742,10 +923,10 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
             content.append(inputLine);
          }
       }
+
       // Disconnect Http connection.
       httpConn.disconnect();
-
-      return getMapper().readValue(content.toString(), TestResult.class);
+      return content;
    }
 
    public static class ArtifactLoadException extends RuntimeException {
