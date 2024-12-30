@@ -29,9 +29,6 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
-import org.testcontainers.shaded.com.github.dockerjava.core.MediaType;
-import org.testcontainers.shaded.com.google.common.net.HttpHeaders;
-import org.testcontainers.shaded.com.google.common.net.UrlEscapers;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 import org.testcontainers.shaded.org.awaitility.core.ConditionTimeoutException;
 import org.testcontainers.utility.DockerImageName;
@@ -73,14 +70,16 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
 
    private static final String MICROCKS_FULL_IMAGE_NAME = "quay.io/microcks/microcks-uber";
    private static final DockerImageName MICROCKS_IMAGE = DockerImageName.parse(MICROCKS_FULL_IMAGE_NAME);
+   private static final SimpleDateFormat METRICS_API_DAY_FORMATTER = new SimpleDateFormat("yyyyMMdd");
    private static final String HTTP_UPLOAD_LINE_FEED = "\r\n";
+   private static final String HTTP_CONTENT_TYPE = "Content-Type";
+   private static final String HTTP_ACCEPT = "Accept";
+   private static final String APPLICATION_JSON = "application/json";
 
    public static final int MICROCKS_HTTP_PORT = 8080;
    public static final int MICROCKS_GRPC_PORT = 9090;
 
    private static ObjectMapper mapper;
-
-   private static SimpleDateFormat metricsApiDayFormatter = new SimpleDateFormat("yyyyMMdd");
 
    private Set<String> snapshotsToImport;
    private Set<String> mainArtifactsToImport;
@@ -342,7 +341,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       }
 
       URL url = new URL(microcksContainerHttpEndpoint + "/api/import");
-      HttpURLConnection httpConn = uploadFileToMicrocks(url, snapshot, "application/json");
+      HttpURLConnection httpConn = uploadFileToMicrocks(url, snapshot, APPLICATION_JSON);
 
       if (httpConn.getResponseCode() != 201) {
          // Read response content for diagnostic purpose and disconnect.
@@ -408,7 +407,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       URL url = new URL(microcksContainerHttpEndpoint + "/api/tests");
       HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
       httpConn.setRequestMethod("POST");
-      httpConn.setRequestProperty(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON.getMediaType());
+      httpConn.setRequestProperty(HTTP_CONTENT_TYPE, APPLICATION_JSON);
       httpConn.setDoOutput(true);
 
       try (OutputStream os = httpConn.getOutputStream()) {
@@ -480,7 +479,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       URL url = new URL(microcksContainerHttpEndpoint + "/api/tests/" + testResult.getId() + "/messages/" + testCaseId);
       HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
       httpConn.setRequestMethod("GET");
-      httpConn.setRequestProperty(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON.getMediaType());
+      httpConn.setRequestProperty(HTTP_ACCEPT, APPLICATION_JSON);
       httpConn.setDoOutput(false);
 
       if (httpConn.getResponseCode() == 200) {
@@ -531,7 +530,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       URL url = new URL(microcksContainerHttpEndpoint + "/api/tests/" + testResult.getId() + "/events/" + testCaseId);
       HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
       httpConn.setRequestMethod("GET");
-      httpConn.setRequestProperty(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON.getMediaType());
+      httpConn.setRequestProperty(HTTP_ACCEPT, APPLICATION_JSON);
       httpConn.setDoOutput(false);
 
       if (httpConn.getResponseCode() == 200) {
@@ -570,9 +569,8 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
 
    /**
     * Verifies that given Service has been invoked at least one time, for the current invocations' date.
-    *
-    * @param serviceName    mandatory
-    * @param serviceVersion mandatory
+    * @param serviceName    The name of the service to verify invocation for
+    * @param serviceVersion The version of the service to verify invocation for
     * @return false if the given service was not found, or if the daily invocation's count is zero. Else, returns true if the daily invocations' count for the given service is at least one.
     */
    public boolean verify(String serviceName, String serviceVersion) {
@@ -581,10 +579,9 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
 
    /**
     * Verifies that given Service has been invoked at least one time, for the current invocations' date.
-    *
-    * @param microcksContainerHttpEndpoint mandatory
-    * @param serviceName                   mandatory
-    * @param serviceVersion                mandatory
+    * @param microcksContainerHttpEndpoint The Http endpoint where to reach running MicrocksContainer
+    * @param serviceName                   The name of the service to verify invocation for
+    * @param serviceVersion                The version of the service to verify invocation for
     * @return false if the given service was not found, or if the daily invocation's count is zero. Else, returns true if the daily invocations' count for the given service is at least one.
     */
    public static boolean verify(String microcksContainerHttpEndpoint, String serviceName, String serviceVersion) {
@@ -594,10 +591,9 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    /**
     * Verifies that given Service has been invoked at least one time, for the given invocations' date.
     * In unit testing context, it should be useless to pass the invocations date, prefer calling {@link #verify(String, String)}`.
-    *
-    * @param serviceName     mandatory
-    * @param serviceVersion  mandatory
-    * @param invocationsDate nullable
+    * @param serviceName     The name of the service to verify invocation for
+    * @param serviceVersion  The version of the service to verify invocation for
+    * @param invocationsDate The date to verify invocation for (nullable)
     * @return false if the given service was not found, or if the daily invocation's count is zero. Else, returns true if the daily invocations' count for the given service is at least one.
     */
    public boolean verify(String serviceName, String serviceVersion, Date invocationsDate) {
@@ -607,11 +603,10 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    /**
     * Verifies that given Service has been invoked at least one time, for the given invocations' date.
     * In unit testing context, it should be useless to pass the invocations date, prefer calling {@link #verify(String, String)}`.
-    *
-    * @param microcksContainerHttpEndpoint mandatory
-    * @param serviceName                   mandatory
-    * @param serviceVersion                mandatory
-    * @param invocationsDate               nullable
+    * @param microcksContainerHttpEndpoint The Http endpoint where to reach running MicrocksContainer
+    * @param serviceName                   The name of the service to verify invocation for
+    * @param serviceVersion                The version of the service to verify invocation for
+    * @param invocationsDate               The date to verify invocation for (nullable)
     * @return false if the given service was not found, or if the daily invocation's count is zero. Else, returns true if the daily invocations' count for the given service is at least one.
     */
    public static boolean verify(String microcksContainerHttpEndpoint, String serviceName, String serviceVersion, Date invocationsDate) {
@@ -626,15 +621,13 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       }
 
       BigDecimal count = dailyInvocationStatistic.getDailyCount();
-
       return count != null && count.intValue() != 0;
    }
 
    /**
     * Get the invocations' count for a given service, identified by its name and version, for the current invocations' date.
-    *
-    * @param serviceName    mandatory
-    * @param serviceVersion mandatory
+    * @param serviceName    The name of the service to get invocations count for
+    * @param serviceVersion The version of the service to get invocations count for
     * @return zero if the given service was not found, or has never been invoked. Else, returns the daily count of invocations for the given service.
     */
    public Long getServiceInvocationsCount(String serviceName, String serviceVersion) {
@@ -643,10 +636,9 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
 
    /**
     * Get the invocations' count for a given service, identified by its name and version, for the current invocations' date.
-    *
-    * @param microcksContainerHttpEndpoint mandatory
-    * @param serviceName                   mandatory
-    * @param serviceVersion                mandatory
+    * @param microcksContainerHttpEndpoint The Http endpoint where to reach running MicrocksContainers
+    * @param serviceName                   The name of the service to get invocations count for
+    * @param serviceVersion                The version of the service to get invocations count for
     * @return zero if the given service was not found, or has never been invoked. Else, returns the daily count of invocations for the given service.
     */
    public static Long getServiceInvocationsCount(String microcksContainerHttpEndpoint, String serviceName, String serviceVersion) {
@@ -656,9 +648,8 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    /**
     * Get the invocations' count for a given service, identified by its name and version, for the given invocations' date.
     * In unit testing context, it should be useless to pass the invocations date, prefer calling {@link #getServiceInvocationsCount(String, String)}`.
-    *
-    * @param serviceName     mandatory
-    * @param serviceVersion  mandatory
+    * @param serviceName     The name of the service to get invocations count for
+    * @param serviceVersion  The version of the service to get invocations count for
     * @param invocationsDate nullable
     * @return zero if the given service was not found, or has never been invoked. Else, returns the daily count of invocations for the given service.
     */
@@ -669,11 +660,10 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    /**
     * Get the invocations' count for a given service, identified by its name and version, for the given invocations' date.
     * In unit testing context, it should be useless to pass the invocations date, prefer calling {@link #getServiceInvocationsCount(String, String)}`.
-    *
-    * @param microcksContainerHttpEndpoint mandatory
-    * @param serviceName                   mandatory
-    * @param serviceVersion                mandatory
-    * @param invocationsDate               nullable
+    * @param microcksContainerHttpEndpoint The Http endpoint where to reach running MicrocksContainer
+    * @param serviceName                   The name of the service to get invocations count for
+    * @param serviceVersion                The version of the service to get invocations count for
+    * @param invocationsDate               The date to get invocations count for (nullable)
     * @return zero if the given service was not found, or has never been invoked. Else, returns the daily count of invocations for the given service.
     */
    public static Long getServiceInvocationsCount(String microcksContainerHttpEndpoint, String serviceName, String serviceVersion, Date invocationsDate) {
@@ -686,30 +676,25 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       if (dailyInvocationStatistic == null) {
          return 0L;
       }
-
       BigDecimal count = dailyInvocationStatistic.getDailyCount();
-
       return count.longValue();
    }
 
 
    /**
     * Returns all data from Microcks Metrics REST API about the invocations of a given service.
-    *
-    * @param microcksContainerHttpEndpoint mandatory
-    * @param serviceName                   mandatory
-    * @param serviceVersion                mandatory
-    * @param invocationsDate               nullable
-    * @return
     */
    private static DailyInvocationStatistic getServiceInvocations(String microcksContainerHttpEndpoint, String serviceName, String serviceVersion, Date invocationsDate) {
-      String encodedServiceName = UrlEscapers.urlFragmentEscaper().escape(serviceName);
-      String encodedServiceVersion = UrlEscapers.urlFragmentEscaper().escape(serviceVersion);
+      // Encode service name and version and take care of replacing '+' by '%20' as metrics API
+      // does not handle '+' in URL path.
+      String encodedServiceName = URLEncoder.encode(serviceName).replace("+", "%20");
+      String encodedServiceVersion = URLEncoder.encode(serviceVersion).replace("+", "%20");
 
-      String restApiURL = String.format("%s/api/metrics/invocations/%s/%s", microcksContainerHttpEndpoint, encodedServiceName, encodedServiceVersion);
+      String restApiURL = String.format("%s/api/metrics/invocations/%s/%s", microcksContainerHttpEndpoint,
+            encodedServiceName, encodedServiceVersion);
 
       if (invocationsDate != null) {
-         restApiURL += "?day=" + metricsApiDayFormatter.format(invocationsDate);
+         restApiURL += "?day=" + METRICS_API_DAY_FORMATTER.format(invocationsDate);
       }
 
       try {
@@ -804,8 +789,8 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          URL url = new URL(getHttpEndpoint() + "/api/secrets");
          HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
          httpConn.setRequestMethod("POST");
-         httpConn.setRequestProperty(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON.getMediaType());
-         httpConn.setRequestProperty(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON.getMediaType());
+         httpConn.setRequestProperty(HTTP_CONTENT_TYPE, APPLICATION_JSON);
+         httpConn.setRequestProperty(HTTP_ACCEPT, APPLICATION_JSON);
          httpConn.setDoOutput(true);
 
          String requestBody = getMapper().writeValueAsString(secret);
@@ -901,28 +886,19 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    }
 
    /**
-    * Does a GET HTTP call to Microcks REST API and expecting to obtain a 200 response with a `application/json` body: returns it as a StringBuilder.
-    *
-    * @param restApiURL mandatory
-    * @return
-    * @throws IOException
+    * Does a GET HTTP call to Microcks REST API and expecting to obtain a 200 response with a `application/json` body:
+    * returns it as a StringBuilder.
     */
    private static StringBuilder getFromRestApi(String restApiURL) throws IOException {
       // Build a new client on correct API endpoint.
       URL url = new URL(restApiURL);
       HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
       httpConn.setRequestMethod("GET");
-      httpConn.setRequestProperty("Accept", "application/json");
+      httpConn.setRequestProperty(HTTP_ACCEPT, APPLICATION_JSON);
       httpConn.setDoOutput(false);
 
       // Send the request and parse response body.
-      StringBuilder content = new StringBuilder();
-      try (BufferedReader br = new BufferedReader(new InputStreamReader(httpConn.getInputStream()))) {
-         String inputLine;
-         while ((inputLine = br.readLine()) != null) {
-            content.append(inputLine);
-         }
-      }
+      StringBuilder content = getResponseContent(httpConn);
 
       // Disconnect Http connection.
       httpConn.disconnect();
