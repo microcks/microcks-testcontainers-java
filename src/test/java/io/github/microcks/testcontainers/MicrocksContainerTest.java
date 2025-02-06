@@ -160,7 +160,7 @@ public class MicrocksContainerTest {
    @Test
    public void testSecretCreation() throws Exception {
       try (
-            MicrocksContainer microcks = new MicrocksContainer(IMAGE)
+            MicrocksContainer microcks = new MicrocksContainer(MICROCKS_IMAGE)
                   .withSecret(new Secret.Builder().name("my-secret").token("abc-123-xyz").build());
       ) {
          microcks.start();

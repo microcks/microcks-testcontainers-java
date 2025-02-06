@@ -54,6 +54,14 @@ public class MicrocksContainersEnsemble implements Startable {
    }
 
    /**
+    * Build a new MicrocksContainersEnsemble with its base container full image name.
+    * @param image This image must be compatible with quay.io/microcks/microcks-uber image.
+    */
+   public MicrocksContainersEnsemble(DockerImageName image) {
+      this(Network.newNetwork(), image);
+   }
+
+   /**
     * Build a new MicrocksContainersEnsemble with a pre-existing network and with its base container full image name.
     * @param network The network to attach ensemble containers to.
     * @param image This image must be compatible with quay.io/microcks/microcks-uber image.
@@ -99,6 +107,19 @@ public class MicrocksContainersEnsemble implements Startable {
    }
 
    /**
+    * Enable the Postman runtime container with provided container image.
+    * @param image This image must be compatible with quay.io/microcks/microcks-postman-runtime image.
+    * @return self
+    */
+   public MicrocksContainersEnsemble withPostman(DockerImageName image) {
+      this.postman = new GenericContainer<>(image)
+            .withNetwork(network)
+            .withNetworkAliases("postman")
+            .waitingFor(Wait.forLogMessage(".*postman-runtime wrapper listening on port.*", 1));
+      return this;
+   }
+
+   /**
     * Enable the Async Feature container with default container image (deduced from Microcks main one).
     * @return self
     */
@@ -116,6 +137,16 @@ public class MicrocksContainersEnsemble implements Startable {
     * @return self
     */
    public MicrocksContainersEnsemble withAsyncFeature(String image) {
+      this.asyncMinion = new MicrocksAsyncMinionContainer(network, image, microcks);
+      return this;
+   }
+
+   /**
+    * Enable the Async Feature container with provided container image.
+    * @param image This image must be compatible with quay.io/microcks/microcks-uber-async-minion image.
+    * @return self
+    */
+   public MicrocksContainersEnsemble withAsyncFeature(DockerImageName image) {
       this.asyncMinion = new MicrocksAsyncMinionContainer(network, image, microcks);
       return this;
    }
