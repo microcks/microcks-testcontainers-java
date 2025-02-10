@@ -94,8 +94,8 @@ import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
  */
 public class MicrocksContainersEnsembleTest {
 
-   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.10.0";
-   private static final String ASYNC_IMAGE = "quay.io/microcks/microcks-uber-async-minion:nightly";
+   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.11.0";
+   private static final String ASYNC_IMAGE = "quay.io/microcks/microcks-uber-async-minion:nightly-native";
    private static final String NATIVE_IMAGE = "quay.io/microcks/microcks-uber:nightly-native";
 
    private static final DockerImageName BAD_PASTRY_IMAGE = DockerImageName.parse("quay.io/microcks/contract-testing-demo:02");
