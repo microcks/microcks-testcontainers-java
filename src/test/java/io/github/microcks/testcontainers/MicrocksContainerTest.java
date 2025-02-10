@@ -219,6 +219,15 @@ public class MicrocksContainerTest {
 
       String baseGrpcUrl = microcks.getGrpcMockEndpoint();
       assertEquals("grpc://" + microcks.getHost() + ":" + microcks.getMappedPort(MicrocksContainer.MICROCKS_GRPC_PORT), baseGrpcUrl);
+
+      String baseWsPath = microcks.getSoapMockEndpointPath("Pastries Service", "1.0");
+      assertEquals("/soap/Pastries Service/1.0", baseWsPath);
+
+      String baseApiPath = microcks.getRestMockEndpointPath("API Pastries", "0.0.1");
+      assertEquals("/rest/API Pastries/0.0.1", baseApiPath);
+
+      String baseGraphPath = microcks.getGraphQLMockEndpointPath("Pastries Graph", "1");
+      assertEquals("/graphql/Pastries Graph/1", baseGraphPath);
    }
 
    private void testMicrocksMockingFunctionality(MicrocksContainer microcks) {

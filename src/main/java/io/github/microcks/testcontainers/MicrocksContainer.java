@@ -235,7 +235,17 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     * @return A usable endpoint to interact with Microcks mocks.
     */
    public String getSoapMockEndpoint(String service, String version) {
-      return String.format("%s/soap/%s/%s", getHttpEndpoint(),  service, version);
+      return String.format("%s/soap/%s/%s", getHttpEndpoint(), service, version);
+   }
+
+   /**
+    * Get the exposed mock endpoint path for a SOAP Service.
+    * @param service The name of Service/API
+    * @param version The version of Service/API
+    * @return A path endpoint to interact with Microcks mocks - starts with '/'.
+    */
+   public String getSoapMockEndpointPath(String service, String version) {
+      return String.format("/soap/%s/%s", service, version);
    }
 
    /**
@@ -245,7 +255,17 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     * @return A usable endpoint to interact with Microcks mocks.
     */
    public String getRestMockEndpoint(String service, String version) {
-      return String.format("%s/rest/%s/%s", getHttpEndpoint(),  service, version);
+      return String.format("%s/rest/%s/%s", getHttpEndpoint(), service, version);
+   }
+
+   /**
+    * Get the exposed mock endpoint path for a REST API.
+    * @param service The name of Service/API
+    * @param version The version of Service/API
+    * @return A path endpoint to interact with Microcks mocks - starts with '/'.
+    */
+   public String getRestMockEndpointPath(String service, String version) {
+      return String.format("/rest/%s/%s", service, version);
    }
 
    /**
@@ -256,6 +276,16 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     */
    public String getGraphQLMockEndpoint(String service, String version) {
       return String.format("%s/graphql/%s/%s", getHttpEndpoint(), service, version);
+   }
+
+   /**
+    * Get the exposed mock endpoint path for a GRPC Service.
+    * @param service The name of Service/API
+    * @param version The version of Service/API
+    * @return A path endpoint to interact with Microcks mocks - starts with '/'.
+    */
+   public String getGraphQLMockEndpointPath(String service, String version) {
+      return String.format("/graphql/%s/%s", service, version);
    }
 
    /**

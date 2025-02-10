@@ -38,6 +38,13 @@ import java.util.stream.Stream;
  */
 public class MicrocksContainersEnsemble implements Startable {
 
+   /** The default network alias for Microcks container. */
+   public static final String MICROCKS_CONTAINER_ALIAS = "microcks";
+   /** The default network alias for Postman container. */
+   public static final String POSTMAN_CONTAINER_ALIAS = "postman";
+   /** The default network alias for Async Minion container. */
+   public static final String MICROCKS_ASYNC_MINION_CONTAINER_ALIAS = "microcks-async-minion";
+
    private final Network network;
 
    private GenericContainer<?> postman;
@@ -79,10 +86,12 @@ public class MicrocksContainersEnsemble implements Startable {
       this.network = network;
       this.microcks = new MicrocksContainer(image)
             .withNetwork(network)
-            .withNetworkAliases("microcks")
+            .withNetworkAliases(MICROCKS_CONTAINER_ALIAS)
             .withEnv("POSTMAN_RUNNER_URL", "http://postman:3000")
-            .withEnv("TEST_CALLBACK_URL", "http://microcks:" + MicrocksContainer.MICROCKS_HTTP_PORT)
-            .withEnv("ASYNC_MINION_URL", "http://microcks-async-minion:" + MicrocksAsyncMinionContainer.MICROCKS_ASYNC_MINION_HTTP_PORT);
+            .withEnv("TEST_CALLBACK_URL", "http://" + MICROCKS_CONTAINER_ALIAS
+                  + ":" + MicrocksContainer.MICROCKS_HTTP_PORT)
+            .withEnv("ASYNC_MINION_URL", "http://" + MICROCKS_ASYNC_MINION_CONTAINER_ALIAS
+                  + ":" + MicrocksAsyncMinionContainer.MICROCKS_ASYNC_MINION_HTTP_PORT);
    }
 
    /**
@@ -101,7 +110,7 @@ public class MicrocksContainersEnsemble implements Startable {
    public MicrocksContainersEnsemble withPostman(String image) {
       this.postman = new GenericContainer<>(DockerImageName.parse(image))
             .withNetwork(network)
-            .withNetworkAliases("postman")
+            .withNetworkAliases(POSTMAN_CONTAINER_ALIAS)
             .waitingFor(Wait.forLogMessage(".*postman-runtime wrapper listening on port.*", 1));
       return this;
    }
@@ -114,7 +123,7 @@ public class MicrocksContainersEnsemble implements Startable {
    public MicrocksContainersEnsemble withPostman(DockerImageName image) {
       this.postman = new GenericContainer<>(image)
             .withNetwork(network)
-            .withNetworkAliases("postman")
+            .withNetworkAliases(POSTMAN_CONTAINER_ALIAS)
             .waitingFor(Wait.forLogMessage(".*postman-runtime wrapper listening on port.*", 1));
       return this;
    }
