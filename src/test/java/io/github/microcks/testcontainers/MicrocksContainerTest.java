@@ -228,6 +228,18 @@ public class MicrocksContainerTest {
 
       String baseGraphPath = microcks.getGraphQLMockEndpointPath("Pastries Graph", "1");
       assertEquals("/graphql/Pastries Graph/1", baseGraphPath);
+
+      String validWsUrl = microcks.getValidatingSoapMockEndpoint("Pastries Service", "1.0");
+      assertEquals(microcks.getHttpEndpoint() + "/soap/Pastries Service/1.0?validate=true", validWsUrl);
+
+      String validApiUrl = microcks.getValidatingRestMockEndpoint("API Pastries", "0.0.1");
+      assertEquals(microcks.getHttpEndpoint() + "/rest-valid/API Pastries/0.0.1", validApiUrl);
+
+      String validWsPath = microcks.getValidatingSoapMockEndpointPath("Pastries Service", "1.0");
+      assertEquals("/soap/Pastries Service/1.0?validate=true", validWsPath);
+
+      String validApiPath = microcks.getValidatingRestMockEndpointPath("API Pastries", "0.0.1");
+      assertEquals("/rest-valid/API Pastries/0.0.1", validApiPath);
    }
 
    private void testMicrocksMockingFunctionality(MicrocksContainer microcks) {

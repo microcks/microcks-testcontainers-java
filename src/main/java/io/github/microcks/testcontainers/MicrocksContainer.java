@@ -249,6 +249,26 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    }
 
    /**
+    * Get the exposed mock endpoint - with request validation enabled - for a SOAP Service.
+    * @param service The name of Service/API
+    * @param version The version of Service/API
+    * @return A usable endpoint to interact with Microcks mocks.
+    */
+   public String getValidatingSoapMockEndpoint(String service, String version) {
+      return String.format("%s/soap/%s/%s?validate=true", getHttpEndpoint(), service, version);
+   }
+
+   /**
+    * Get the exposed mock endpoint path - with request validation enabled - for a SOAP Service.
+    * @param service The name of Service/API
+    * @param version The version of Service/API
+    * @return A path endpoint to interact with Microcks mocks - starts with '/'.
+    */
+   public String getValidatingSoapMockEndpointPath(String service, String version) {
+      return String.format("/soap/%s/%s?validate=true", service, version);
+   }
+
+   /**
     * Get the exposed mock endpoint for a REST API.
     * @param service The name of Service/API
     * @param version The version of Service/API
@@ -266,6 +286,26 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     */
    public String getRestMockEndpointPath(String service, String version) {
       return String.format("/rest/%s/%s", service, version);
+   }
+
+   /**
+    * Get the exposed mock endpoint - with request validation enabled - for a REST API.
+    * @param service The name of Service/API
+    * @param version The version of Service/API
+    * @return A usable endpoint to interact with Microcks mocks.
+    */
+   public String getValidatingRestMockEndpoint(String service, String version) {
+      return String.format("%s/rest-valid/%s/%s", getHttpEndpoint(), service, version);
+   }
+
+   /**
+    * Get the exposed mock endpoint path - with request validation enabled - for a REST API.
+    * @param service The name of Service/API
+    * @param version The version of Service/API
+    * @return A path endpoint to interact with Microcks mocks - starts with '/'.
+    */
+   public String getValidatingRestMockEndpointPath(String service, String version) {
+      return String.format("/rest-valid/%s/%s", service, version);
    }
 
    /**
