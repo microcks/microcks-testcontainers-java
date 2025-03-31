@@ -58,7 +58,7 @@
     <testcontainers.version>1.20.4</testcontainers.version>
     <jupiter.version>5.11.4</jupiter.version>
     <rest-assured.version>5.5.0</rest-assured.version>
-    <java-websocket.version>1.5.4</java-websocket.version>
+    <java-websocket.version>1.6.0</java-websocket.version>
   </properties>
 
   <dependencies>
