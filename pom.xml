@@ -5,7 +5,7 @@
   <groupId>io.github.microcks</groupId>
   <artifactId>microcks-testcontainers</artifactId>
   <packaging>jar</packaging>
-  <version>0.3.1-SNAPSHOT</version>
+  <version>0.3.1</version>
 
   <name>Microcks Testcontainers</name>
   <description>Microcks Testcontainers Java library</description>
