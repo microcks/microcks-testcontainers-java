@@ -54,7 +54,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 public class MicrocksContainerTest {
 
-   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.11.0";
+   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.12.0";
    private static final DockerImageName MICROCKS_IMAGE = DockerImageName.parse(IMAGE);
 
    private static final DockerImageName BAD_PASTRY_IMAGE = DockerImageName.parse("quay.io/microcks/contract-testing-demo:01");
@@ -321,7 +321,7 @@ public class MicrocksContainerTest {
       assertFalse(testResult.isSuccess());
       assertEquals("http://bad-impl:3001", testResult.getTestedEndpoint());
       assertEquals(3, testResult.getTestCaseResults().size());
-      assertTrue(testResult.getTestCaseResults().get(0).getTestStepResults().get(0).getMessage().contains("object has missing required properties"));
+      assertTrue(testResult.getTestCaseResults().get(0).getTestStepResults().get(0).getMessage().contains("required property 'status' not found"));
 
       // Retrieve messages for the failing test case.
       List<RequestResponsePair> messages = microcks.getMessagesForTestCase(testResult, "GET /pastries");

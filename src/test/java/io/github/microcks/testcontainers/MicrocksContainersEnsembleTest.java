@@ -94,7 +94,7 @@ import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
  */
 public class MicrocksContainersEnsembleTest {
 
-   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.11.0";
+   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.12.0";
    private static final String ASYNC_IMAGE = "quay.io/microcks/microcks-uber-async-minion:nightly-native";
    private static final String NATIVE_IMAGE = "quay.io/microcks/microcks-uber:nightly-native";
 
@@ -679,7 +679,7 @@ public class MicrocksContainersEnsembleTest {
       // Ensure we had at least grab one message.
       assertFalse(testResult.getTestCaseResults().get(0).getTestStepResults().isEmpty());
       TestStepResult testStepResult = testResult.getTestCaseResults().get(0).getTestStepResults().get(0);
-      assertTrue(testStepResult.getMessage().contains("object has missing required properties ([\"status\"]"));
+      assertTrue(testStepResult.getMessage().contains("required property 'status' not found"));
 
       // Switch endpoint to the correct implementation.
       // Other way of doing things via builder and fluent api.
@@ -766,7 +766,7 @@ public class MicrocksContainersEnsembleTest {
       // Ensure we had at least grab one message.
       assertFalse(testResult.getTestCaseResults().get(0).getTestStepResults().isEmpty());
       TestStepResult testStepResult = testResult.getTestCaseResults().get(0).getTestStepResults().get(0);
-      assertTrue(testStepResult.getMessage().contains("object has missing required properties ([\"status\"]"));
+      assertTrue(testStepResult.getMessage().contains("required property 'status' not found"));
 
       // Retrieve event messages for the failing test case.
       List<UnidirectionalEvent> events = ensemble.getMicrocksContainer().getEventMessagesForTestCase(testResult,
@@ -891,7 +891,7 @@ public class MicrocksContainersEnsembleTest {
       // Ensure we had at least grab one message.
       assertFalse(testResult.getTestCaseResults().get(0).getTestStepResults().isEmpty());
       TestStepResult testStepResult = testResult.getTestCaseResults().get(0).getTestStepResults().get(0);
-      assertTrue(testStepResult.getMessage().contains("object has missing required properties ([\"status\"]"));
+      assertTrue(testStepResult.getMessage().contains("required property 'status' not found"));
 
 
       // Switch endpoint to the correct implementation.
