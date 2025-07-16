@@ -11,9 +11,9 @@ Java library for Testcontainers that enables embedding Microcks into your JUnit 
 
 ## Build Status
 
-Latest released version is `0.3.0`.
+Latest released version is `0.3.2`.
 
-Current development version is `0.3.1-SNAPSHOT`.
+Current development version is `0.3.3-SNAPSHOT`.
 
 #### Sonarcloud Quality metrics
 
@@ -53,7 +53,7 @@ If you're using Maven:
 <dependency>
   <groupId>io.github.microcks</groupId>
   <artifactId>microcks-testcontainers</artifactId>
-  <version>0.3.0</version>
+  <version>0.3.2</version>
 </dependency>
 ```
 
@@ -61,7 +61,7 @@ or if you're using Gradle:
 
 ```groovy
 dependencies {
-    testImplementation 'io.github.microcks:microcks-testcontainers:0.3.0'
+    testImplementation 'io.github.microcks:microcks-testcontainers:0.3.2'
 }
 ```
 
@@ -73,7 +73,7 @@ Version `0.2.9` and above require version `1.10.0` of Microcks container images 
 
 ```java
 MicrocksContainer microcks = new MicrocksContainer(
-      DockerImageName.parse("quay.io/microcks/microcks-uber:1.10.0"));
+      DockerImageName.parse("quay.io/microcks/microcks-uber:1.12.0"));
 microcks.start();
 ```
 
@@ -85,7 +85,7 @@ Artifacts can be imported as main/Primary ones or as secondary ones. See [Multi-
 You can do it before starting the container using simple paths:
 
 ```java
-MicrocksContainer microcks = new MicrocksContainer(DockerImageName.parse("quay.io/microcks/microcks-uber:1.10.0"))
+MicrocksContainer microcks = new MicrocksContainer(DockerImageName.parse("quay.io/microcks/microcks-uber:1.12.0"))
     .withMainArtifacts("apipastries-openapi.yaml")
     .withSecondaryArtifacts("apipastries-postman-collection.json");
 microcks.start();
@@ -103,7 +103,7 @@ Please refer to our [MicrocksContainerTest](https://github.com/microcks/microcks
 You can also import full [repository snapshots](https://microcks.io/documentation/administrating/snapshots/) at once:
 
 ```java
-MicrocksContainer microcks = new MicrocksContainer(DockerImageName.parse("quay.io/microcks/microcks-uber:1.10.0"))
+MicrocksContainer microcks = new MicrocksContainer(DockerImageName.parse("quay.io/microcks/microcks-uber:1.12.0"))
       .withSnapshots("microcks-repository.json");
 microcks.start();
 ```
