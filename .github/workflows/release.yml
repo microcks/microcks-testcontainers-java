@@ -11,6 +11,11 @@ on:
       nextVersion:
         description: 'Next version after release (-SNAPSHOT will be added automatically)'
         required: true
+      deployActive:
+        description: 'Deploy Active value for JReleaser'
+        required: false
+        default: 'ALWAYS'
+        type: string
 jobs:
   release:
     name: Release
@@ -58,6 +63,7 @@ jobs:
           JRELEASER_GPG_SECRET_KEY: ${{ secrets.JRELEASER_GPG_SECRET_KEY }}
           JRELEASER_GPG_PUBLIC_KEY: ${{ secrets.JRELEASER_GPG_PUBLIC_KEY }}
           JRELEASER_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JRELEASER_DEPLOY_ACTIVE: ${{ github.event.inputs.deployActive }}
         run: mvn -N -Prelease jreleaser:assemble jreleaser:full-release
 
       # Persist logs

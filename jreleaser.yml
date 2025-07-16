@@ -3,8 +3,9 @@ project:
   description: Microcks Testcontainers Java library
   longDescription: Microcks Testcontainers Java library
   copyright: The Microcks Authors
-  java:
-    version: 8
+  languages:
+    java:
+      version: '8'
 
 signing:
   active: ALWAYS
@@ -42,6 +43,7 @@ deploy:
         applyMavenCentralRules: true
         stagingRepositories:
           - target/staging-deploy
+        verifyUrl: 'https://repo1.maven.org/maven2/{{path}}/{{filename}}'
     pomchecker:
       failOnWarning: false
       failOnError: false
