@@ -84,8 +84,8 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    private Set<String> snapshotsToImport;
    private Set<String> mainArtifactsToImport;
    private Set<String> secondaryArtifactsToImport;
-   private Set<String> mainRemoteArtifactsToImport;
-   private Set<String> secondaryRemoteArtifactsToImport;
+   private Set<RemoteArtifact> mainRemoteArtifactsToImport;
+   private Set<RemoteArtifact> secondaryRemoteArtifactsToImport;
    private Set<Secret> secrets;
 
    /**
@@ -149,7 +149,22 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       if (mainRemoteArtifactsToImport == null) {
          mainRemoteArtifactsToImport = new HashSet<>();
       }
-      mainRemoteArtifactsToImport.addAll(Arrays.stream(remoteArtifactUrls).collect(Collectors.toList()));
+      mainRemoteArtifactsToImport.addAll(Arrays.stream(remoteArtifactUrls)
+            .map(url -> RemoteArtifact.of(url, null)).collect(Collectors.toSet()));
+      return self();
+   }
+
+   /**
+    * Provide remote artifacts (with secret name) that will be imported as primary or main ones within the Microcks
+    * container once it will be started and healthy.
+    * @param remoteArtifacts A set of remote artifacts that will be loaded
+    * @return self
+    */
+   public MicrocksContainer withMainRemoteArtifacts(RemoteArtifact... remoteArtifacts) {
+      if (mainRemoteArtifactsToImport == null) {
+         mainRemoteArtifactsToImport = new HashSet<>();
+      }
+      mainRemoteArtifactsToImport.addAll(Arrays.stream(remoteArtifacts).collect(Collectors.toSet()));
       return self();
    }
 
@@ -163,7 +178,22 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       if (secondaryRemoteArtifactsToImport == null) {
          secondaryRemoteArtifactsToImport = new HashSet<>();
       }
-      secondaryRemoteArtifactsToImport.addAll(Arrays.stream(remoteArtifactUrls).collect(Collectors.toList()));
+      secondaryRemoteArtifactsToImport.addAll(Arrays.stream(remoteArtifactUrls)
+            .map(url -> RemoteArtifact.of(url, null)).collect(Collectors.toSet()));
+      return self();
+   }
+
+   /**
+    * Provide remote artifacts (with secret name)  that will be imported as secondary ones within the Microcks
+    * container once it will be started and healthy.
+    * @param remoteArtifacts A set of remote artifacts that will be loaded
+    * @return self
+    */
+   public MicrocksContainer withSecondaryRemoteArtifacts(RemoteArtifact... remoteArtifacts) {
+      if (secondaryRemoteArtifactsToImport == null) {
+         secondaryRemoteArtifactsToImport = new HashSet<>();
+      }
+      secondaryRemoteArtifactsToImport.addAll(Arrays.stream(remoteArtifacts).collect(Collectors.toSet()));
       return self();
    }
 
@@ -200,12 +230,16 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       if (snapshotsToImport != null && !snapshotsToImport.isEmpty()) {
          snapshotsToImport.forEach(this::importSnapshot);
       }
+      // Load secrets before remote artifacts as they may be needed for authentication.
+      if (secrets != null && !secrets.isEmpty()) {
+         secrets.forEach(this::createSecret);
+      }
       // Load remote artifacts before local ones.
       if (mainRemoteArtifactsToImport != null && !mainRemoteArtifactsToImport.isEmpty()) {
-         mainRemoteArtifactsToImport.forEach((String remoteArtifactUrl) -> this.downloadArtifact(remoteArtifactUrl, true));
+         mainRemoteArtifactsToImport.forEach(remoteArtifact -> this.downloadArtifact(remoteArtifact, true));
       }
       if (secondaryRemoteArtifactsToImport != null && !secondaryRemoteArtifactsToImport.isEmpty()) {
-         secondaryRemoteArtifactsToImport.forEach((String remoteArtifactUrl) -> this.downloadArtifact(remoteArtifactUrl, false));
+         secondaryRemoteArtifactsToImport.forEach(remoteArtifact -> this.downloadArtifact(remoteArtifact, false));
       }
       // Load local ones that may override remote ones.
       if (mainArtifactsToImport != null && !mainArtifactsToImport.isEmpty()) {
@@ -213,10 +247,6 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       }
       if (secondaryArtifactsToImport != null && !secondaryArtifactsToImport.isEmpty()) {
          secondaryArtifactsToImport.forEach((String artifactPath) -> this.importArtifact(artifactPath, false));
-      }
-      // Load secrets before remote artifacts as they may be needed for authentication.
-      if (secrets != null && !secrets.isEmpty()) {
-         secrets.forEach(this::createSecret);
       }
    }
 
@@ -625,7 +655,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     * @throws ArtifactLoadException If artifact cannot be correctly downloaded in container (probably not found)
     */
    public void downloadAsMainRemoteArtifact(String remoteArtifactUrl) throws ArtifactLoadException {
-      downloadArtifact(remoteArtifactUrl, true);
+      downloadArtifact(new RemoteArtifact(remoteArtifactUrl, null), true);
    }
 
    /**
@@ -634,7 +664,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     * @throws ArtifactLoadException If artifact cannot be correctly downloaded in container (probably not found)
     */
    public void downloadAsSecondaryRemoteArtifact(String remoteArtifactUrl) throws ArtifactLoadException {
-      downloadArtifact(remoteArtifactUrl, false);
+      downloadArtifact(new RemoteArtifact(remoteArtifactUrl, null), false);
    }
 
    /**
@@ -803,7 +833,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       }
    }
 
-   private void downloadArtifact(String remoteArtifactUrl, boolean mainArtifact) throws ArtifactLoadException {
+   private void downloadArtifact(RemoteArtifact remoteArtifact, boolean mainArtifact) throws ArtifactLoadException {
       try {
          // Use the artifact/download endpoint to download the artifact.
          URL url = new URL(getHttpEndpoint() + "/api/artifact/download");
@@ -812,7 +842,11 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          httpConn.setRequestMethod("POST");
          httpConn.setDoOutput(true);
 
-         String requestBody = "mainArtifact=" + mainArtifact + "&url=" + remoteArtifactUrl;
+         String requestBody = "mainArtifact=" + mainArtifact + "&url=" + remoteArtifact.getUrl();
+
+         if (remoteArtifact.getSecretName() != null) {
+            requestBody += "&secretName=" + remoteArtifact.getSecretName();
+         }
 
          // Write the request body to the output stream of the connection
          try (OutputStream os = httpConn.getOutputStream();
@@ -832,8 +866,8 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          // Disconnect Http connection.
          httpConn.disconnect();
       } catch (Exception e) {
-         log.error("Could not load remote artifact: {}", remoteArtifactUrl);
-         throw new ArtifactLoadException("Error while importing remote artifact: " + remoteArtifactUrl, e);
+         log.error("Could not load remote artifact: {}", remoteArtifact.getUrl());
+         throw new ArtifactLoadException("Error while importing remote artifact: " + remoteArtifact.getUrl(), e);
       }
    }
 
@@ -843,7 +877,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          resource = MicrocksContainer.class.getClassLoader().getResource(snapshotPath);
          if (resource == null) {
             log.warn("Could not load classpath snapshot: {}", snapshotPath);
-            throw new ArtifactLoadException("Error while importing snasphot: " + snapshotPath);
+            throw new ArtifactLoadException("Error while importing snapshot: " + snapshotPath);
          }
       }
       try {

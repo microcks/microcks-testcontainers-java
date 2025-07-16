@@ -161,7 +161,10 @@ public class MicrocksContainerTest {
    public void testSecretCreation() throws Exception {
       try (
             MicrocksContainer microcks = new MicrocksContainer(MICROCKS_IMAGE)
-                  .withSecret(new Secret.Builder().name("my-secret").token("abc-123-xyz").build());
+                  .withSecret(new Secret.Builder().name("my-secret").token("abc-123-xyz").tokenHeader("x-microcks").build())
+                  .withMainRemoteArtifacts(
+                        RemoteArtifact.of("https://raw.githubusercontent.com/microcks/microcks/master/samples/APIPastry-openapi.yaml",
+                              "my-secret"));
       ) {
          microcks.start();
          testMicrocksConfigRetrieval(microcks.getHttpEndpoint());
@@ -174,6 +177,7 @@ public class MicrocksContainerTest {
          assertEquals(1, secrets.jsonPath().getList(".").size());
          assertEquals("my-secret", secrets.jsonPath().get("[0].name"));
          assertEquals("abc-123-xyz", secrets.jsonPath().get("[0].token"));
+         assertEquals("x-microcks", secrets.jsonPath().get("[0].tokenHeader"));
       }
    }
 

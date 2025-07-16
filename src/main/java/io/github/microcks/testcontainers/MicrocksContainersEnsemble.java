@@ -265,6 +265,17 @@ public class MicrocksContainersEnsemble implements Startable {
    }
 
    /**
+    * Provide remote artifacts that will be imported as primary or main ones within the Microcks container
+    * once it will be started and healthy.
+    * @param remoteArtifacts A set of remote artifacts that will be loaded
+    * @return self
+    */
+   public MicrocksContainersEnsemble withMainRemoteArtifacts(RemoteArtifact... remoteArtifacts) {
+      microcks.withMainRemoteArtifacts(remoteArtifacts);
+      return this;
+   }
+
+   /**
     * Provide urls to artifacts that will be imported as secondary ones within the Microcks container
     * once it will be started and healthy.
     * @param remoteArtifactUrls A set of urls to artifacts that will be loaded as remote one
@@ -272,6 +283,17 @@ public class MicrocksContainersEnsemble implements Startable {
     */
    public MicrocksContainersEnsemble withSecondaryRemoteArtifacts(String... remoteArtifactUrls) {
       microcks.withSecondaryRemoteArtifacts(remoteArtifactUrls);
+      return this;
+   }
+
+   /**
+    * Provide remote artifacts that will be imported as secondary ones within the Microcks container
+    * once it will be started and healthy.
+    * @param remoteArtifactUrl A set of remote artifacts that will be loaded
+    * @return self
+    */
+   public MicrocksContainersEnsemble withSecondaryRemoteArtifacts(RemoteArtifact... remoteArtifactUrl) {
+      microcks.withSecondaryRemoteArtifacts(remoteArtifactUrl);
       return this;
    }
 
