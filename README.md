@@ -9,6 +9,23 @@ Java library for Testcontainers that enables embedding Microcks into your JUnit 
 [![Artifact HUB](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/microcks-uber-image&style=for-the-badge)](https://artifacthub.io/packages/search?repo=microcks-uber-image)
 [![CNCF Landscape](https://img.shields.io/badge/CNCF%20Landscape-5699C6?style=for-the-badge&logo=cncf)](https://landscape.cncf.io/?item=app-definition-and-development--application-definition-image-build--microcks)
 
+### Table of Contents
+[Build Status](#build-status)  
+[Community](#community)  
+[How to use it?](#how-to-use-it)  
+- [Include it into your project dependencies](#include-it-into-your-project-dependencies)
+- [Startup the container](#startup-the-container)
+- [Import content in Microcks](#import-content-in-microcks)
+- [Using mock endpoints for your dependencies](#using-mock-endpoints-for-your-dependencies)
+- [Verifying mock endpoint has been invoked](#verifying-mock-endpoint-has-been-invoked)
+- [Launching new contract-tests](#launching-new-contract-tests)
+- [Using authentication Secrets](#using-authentication-secrets)
+- [Advanced features with MicrocksContainersEnsemble](#advanced-features-with-microckscontainersensemble)
+  - [Postman contract-testing](#postman-contract-testing)
+  - [Asynchronous API support](#asynchronous-api-support)
+    - [Using mock endpoints for your dependencies](#using-mock-endpoints-for-your-dependencies-1)
+    - [Launching new contract-tests](#launching-new-contract-tests-1)
+
 ## Build Status
 
 Latest released version is `0.3.2`.
@@ -168,6 +185,23 @@ public void testOpenAPIContract() throws Exception {
 ```
 
 The `TestResult` gives you access to all details regarding success of failure on different test cases.
+
+Since version `0.4.0`, you can also use our `Assertions` helpers to quickly evaluate the `TestResult` details 
+and get JUnit formatted detailed errors:
+
+```java
+// Check global success and get details on all failed test steps for all test cases.
+Assertions.assertSuccess(testResult);
+// Check operation level success and get details on all failed test steps.
+Assertions.assertSuccess(testResult, "GET /pastries/{name}");
+// Check operation level success and get details only on this test step.
+Assertions.assertSuccess(testResult, "GET /pastries/{name}", "Millefeuille");
+
+// Check operation level failure and get details on all failed test steps.
+Assertions.assertFailure(testResult, "GET /pastries/{name}");
+// Check operation level failure and get details only on this test step.
+Assertions.assertFailure(testResult, "GET /pastries/{name}", "Millefeuille");
+```
 
 In addition, you can use the `getMessagesForTestCase()` method to retrieve the messages exchanged during the test.
 
