@@ -29,7 +29,7 @@ import dasniko.testcontainers.keycloak.KeycloakContainer;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import org.apache.commons.lang3.time.DateUtils;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -52,7 +52,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * This is a test case for MicrocksContainer class.
  * @author laurent
  */
-public class MicrocksContainerTest {
+class MicrocksContainerTest {
 
    private static final String IMAGE = "quay.io/microcks/microcks-uber:1.12.0";
    private static final DockerImageName MICROCKS_IMAGE = DockerImageName.parse(IMAGE);
@@ -61,7 +61,7 @@ public class MicrocksContainerTest {
    private static final DockerImageName GOOD_PASTRY_IMAGE = DockerImageName.parse("quay.io/microcks/contract-testing-demo:02");
 
    @Test
-   public void testMockingFunctionality() throws Exception {
+   void testMockingFunctionality() throws Exception {
       try (
             MicrocksContainer microcks = new MicrocksContainer(IMAGE)
                   .withSnapshots("microcks-repository.json")
@@ -79,7 +79,7 @@ public class MicrocksContainerTest {
    }
 
    @Test
-   public void testContractTestingFunctionality() throws Exception {
+   void testContractTestingFunctionality() throws Exception {
       try (
             Network network = Network.newNetwork();
             MicrocksContainer microcks = new MicrocksContainer(MICROCKS_IMAGE)
@@ -105,7 +105,7 @@ public class MicrocksContainerTest {
    }
 
    @Test
-   public void testContractTestingFunctionalityWithOAuth2() throws Exception {
+   void testContractTestingFunctionalityWithOAuth2() throws Exception {
       try (
             Network network = Network.newNetwork();
             MicrocksContainer microcks = new MicrocksContainer(MICROCKS_IMAGE)
@@ -158,7 +158,7 @@ public class MicrocksContainerTest {
    }
 
    @Test
-   public void testSecretCreation() throws Exception {
+   void testSecretCreation() throws Exception {
       try (
             MicrocksContainer microcks = new MicrocksContainer(MICROCKS_IMAGE)
                   .withSecret(new Secret.Builder().name("my-secret").token("abc-123-xyz").tokenHeader("x-microcks").build())

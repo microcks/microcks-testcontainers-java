@@ -49,7 +49,7 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.drafts.Draft_6455;
 import org.java_websocket.handshake.ServerHandshake;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.KafkaContainer;
@@ -92,7 +92,7 @@ import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
  * This is a test case for MicrocksContainersEnsemble class.
  * @author laurent
  */
-public class MicrocksContainersEnsembleTest {
+class MicrocksContainersEnsembleTest {
 
    private static final String IMAGE = "quay.io/microcks/microcks-uber:1.12.0";
    private static final String ASYNC_IMAGE = "quay.io/microcks/microcks-uber-async-minion:nightly-native";
@@ -105,7 +105,7 @@ public class MicrocksContainersEnsembleTest {
    private static final DockerImageName GOOD_PASTRY_ASYNC_IMAGE = DockerImageName.parse("quay.io/microcks/contract-testing-demo-async:02");
 
    @Test
-   public void testMockingFunctionality() throws Exception {
+   void testMockingFunctionality() throws Exception {
       try (
             MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(IMAGE)
                   .withMainArtifacts("apipastries-openapi.yaml")
@@ -120,7 +120,7 @@ public class MicrocksContainersEnsembleTest {
    }
 
    @Test
-   public void testPostmanContractTestingFunctionality() throws Exception {
+   void testPostmanContractTestingFunctionality() throws Exception {
       try (
             MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(IMAGE).withPostman();
 
@@ -145,7 +145,7 @@ public class MicrocksContainersEnsembleTest {
    }
 
    @Test
-   public void testAsyncFeatureSetup() {
+   void testAsyncFeatureSetup() {
       MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(NATIVE_IMAGE).withAsyncFeature();
 
       assertEquals("quay.io/microcks/microcks-uber-async-minion:nightly",
@@ -153,7 +153,7 @@ public class MicrocksContainersEnsembleTest {
    }
 
    @Test
-   public void testAsyncFeatureMockingFunctionality() throws Exception {
+   void testAsyncFeatureMockingFunctionality() throws Exception {
       try (
             MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(IMAGE)
                   .withMainArtifacts("pastry-orders-asyncapi.yml")
@@ -167,7 +167,7 @@ public class MicrocksContainersEnsembleTest {
    }
 
    @Test
-   public void testAsyncFeatureKafkaMockingFunctionality() throws Exception {
+   void testAsyncFeatureKafkaMockingFunctionality() throws Exception {
       try (
             MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(IMAGE)
                   .withMainArtifacts("pastry-orders-asyncapi.yml")
@@ -188,7 +188,7 @@ public class MicrocksContainersEnsembleTest {
    }
 
    @Test
-   public void testAsyncFeatureMQTTMockingFunctionality() throws Exception {
+   void testAsyncFeatureMQTTMockingFunctionality() throws Exception {
       try (
             MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(NATIVE_IMAGE)
                   .withMainArtifacts("pastry-orders-asyncapi.yml")
@@ -208,7 +208,7 @@ public class MicrocksContainersEnsembleTest {
    }
 
    @Test
-   public void testAsyncFeatureAMQPMockingFunctionality() throws Exception {
+   void testAsyncFeatureAMQPMockingFunctionality() throws Exception {
       try (
             MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(NATIVE_IMAGE)
                   .withMainArtifacts("pastry-orders-asyncapi.yml")
@@ -231,7 +231,7 @@ public class MicrocksContainersEnsembleTest {
    }
 
    @Test
-   public void testAsyncFeatureAmazonSQSMockingFunctionality() throws Exception {
+   void testAsyncFeatureAmazonSQSMockingFunctionality() throws Exception {
       Network network = null;
       LocalStackContainer localstack = null;
       MicrocksContainersEnsemble ensemble = null;
@@ -261,7 +261,7 @@ public class MicrocksContainersEnsembleTest {
    }
 
    @Test
-   public void testAsyncFeatureTestingFunctionality() throws Exception {
+   void testAsyncFeatureTestingFunctionality() throws Exception {
       try (
             MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(IMAGE)
                   .withMainArtifacts("pastry-orders-asyncapi.yml")
@@ -287,7 +287,7 @@ public class MicrocksContainersEnsembleTest {
    }
 
    @Test
-   public void testAsyncFeatureKafkaTestingFunctionality() throws Exception {
+   void testAsyncFeatureKafkaTestingFunctionality() throws Exception {
       try (
             MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(IMAGE)
                   .withMainArtifacts("pastry-orders-asyncapi.yml")
@@ -308,7 +308,7 @@ public class MicrocksContainersEnsembleTest {
    }
 
    @Test
-   public void testAsyncFeatureAmazonSQSTestingFunctionality() throws Exception {
+   void testAsyncFeatureAmazonSQSTestingFunctionality() throws Exception {
       Network network = null;
       LocalStackContainer localstack = null;
       MicrocksContainersEnsemble ensemble = null;
