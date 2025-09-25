@@ -27,7 +27,9 @@ import org.testcontainers.lifecycle.Startable;
 import org.testcontainers.utility.DockerImageName;
 
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -50,6 +52,10 @@ public class MicrocksContainersEnsemble implements Startable {
    private GenericContainer<?> postman;
    private MicrocksAsyncMinionContainer asyncMinion;
    private final MicrocksContainer microcks;
+
+   private final Map<String, String> postmanEnvVars = new HashMap();
+   private final Map<String, String> asyncMinionEnvVars = new HashMap();
+   private final Map<String, String> microcksEnvVars = new HashMap();
 
    /**
     * Build a new MicrocksContainersEnsemble with its base container image name as string. This image must
@@ -95,6 +101,17 @@ public class MicrocksContainersEnsemble implements Startable {
    }
 
    /**
+    * Add an environment variable to Postman runtime container.
+    * @param key The env var name
+    * @param value The env var value
+    * @return self
+    */
+   public MicrocksContainersEnsemble withMicrocksEnv(String key, String value) {
+      microcksEnvVars.put(key, value);
+      return this;
+   }
+
+   /**
     * Enable the Postman runtime container with default container image.
     * @return self
     */
@@ -129,6 +146,17 @@ public class MicrocksContainersEnsemble implements Startable {
    }
 
    /**
+    * Add an environment variable to Postman runtime container.
+    * @param key The env var name
+    * @param value The env var value
+    * @return self
+    */
+   public MicrocksContainersEnsemble withPostmanEnv(String key, String value) {
+      postmanEnvVars.put(key, value);
+      return this;
+   }
+
+   /**
     * Enable the Async Feature container with default container image (deduced from Microcks main one).
     * @return self
     */
@@ -157,6 +185,18 @@ public class MicrocksContainersEnsemble implements Startable {
     */
    public MicrocksContainersEnsemble withAsyncFeature(DockerImageName image) {
       this.asyncMinion = new MicrocksAsyncMinionContainer(network, image, microcks);
+      return this;
+   }
+
+   /**
+    * Add an environment variable to Async Minion container.
+    * @param key The env var name
+    * @param value The env var value
+    * @return self
+    */
+   public MicrocksContainersEnsemble withAsyncMinionEnv(String key, String value) {
+      ensureAsyncFeatureIsEnabled();
+      asyncMinionEnvVars.put(key, value);
       return this;
    }
 
@@ -355,11 +395,14 @@ public class MicrocksContainersEnsemble implements Startable {
    @Override
    public void start() {
       // Sequential start to avoid resource contention on CI systems with weaker hardware.
+      microcksEnvVars.forEach(microcks::withEnv);
       microcks.start();
       if (postman != null) {
+         postmanEnvVars.forEach(postman::withEnv);
          postman.start();
       }
       if (asyncMinion != null) {
+         asyncMinionEnvVars.forEach(asyncMinion::withEnv);
          asyncMinion.start();
       }
    }
