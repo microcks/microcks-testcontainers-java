@@ -318,9 +318,9 @@ class MicrocksContainerTest {
       // First test should fail with validation failure messages.
       TestResult testResult = microcks.testEndpoint(testRequest);
 
-      System.err.println(microcks.getLogs());
-      ObjectMapper mapper = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
-      System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(testResult));
+//      System.err.println(microcks.getLogs());
+//      ObjectMapper mapper = new ObjectMapper().setSerializationInclusion(JsonInclude.Include.NON_NULL);
+//      System.out.println(mapper.writerWithDefaultPrettyPrinter().writeValueAsString(testResult));
 
       assertFalse(testResult.isSuccess());
       assertEquals("http://bad-impl:3001", testResult.getTestedEndpoint());

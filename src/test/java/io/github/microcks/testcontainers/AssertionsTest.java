@@ -148,4 +148,36 @@ public class AssertionsTest {
          fail("An AssertionFailedError should have been thrown");
       }
    }
+
+   @Test
+   void testFailureWithEmptyCases() {
+      TestResult result = new TestResult();
+      result.setId("testFailureWithEmptyCases");
+      result.setSuccess(false);
+      result.setTestCaseResults(List.of());
+
+      boolean failed = false;
+      try {
+         Assertions.assertSuccess(result);
+      } catch (Error error) {
+         failed = true;
+         assertInstanceOf(AssertionFailedError.class, error);
+         assertEquals("Test 'testFailureWithEmptyCases' is not a success, but has no failure details", error.getMessage());
+      }
+      if (!failed) {
+         fail("An AssertionFailedError should have been thrown");
+      }
+
+      failed = false;
+      try {
+         Assertions.assertSuccess(result, "op1");
+      } catch (Error error) {
+         failed = true;
+         assertInstanceOf(AssertionFailedError.class, error);
+         assertEquals("Test 'testFailureWithEmptyCases' has no test case for operation 'op1'", error.getMessage());
+      }
+      if (!failed) {
+         fail("An AssertionFailedError should have been thrown");
+      }
+   }
 }

@@ -41,6 +41,7 @@ public class Assertions {
          if (!failures.isEmpty()) {
             throw new MultipleFailuresError("Test '" + testResult.getId() + "' has failed", failures);
          }
+         throw new AssertionFailedError("Test '" + testResult.getId() + "' is not a success, but has no failure details");
       }
    }
 
