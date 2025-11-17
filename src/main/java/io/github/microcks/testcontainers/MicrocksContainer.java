@@ -236,10 +236,10 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       }
       // Load remote artifacts before local ones.
       if (mainRemoteArtifactsToImport != null && !mainRemoteArtifactsToImport.isEmpty()) {
-         mainRemoteArtifactsToImport.forEach(remoteArtifact -> this.downloadArtifact(remoteArtifact, true));
+         mainRemoteArtifactsToImport.forEach(remoteArtifact -> downloadArtifact(getHttpEndpoint(), remoteArtifact, true));
       }
       if (secondaryRemoteArtifactsToImport != null && !secondaryRemoteArtifactsToImport.isEmpty()) {
-         secondaryRemoteArtifactsToImport.forEach(remoteArtifact -> this.downloadArtifact(remoteArtifact, false));
+         secondaryRemoteArtifactsToImport.forEach(remoteArtifact -> downloadArtifact(getHttpEndpoint(), remoteArtifact, false));
       }
       // Load local ones that may override remote ones.
       if (mainArtifactsToImport != null && !mainArtifactsToImport.isEmpty()) {
@@ -655,7 +655,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     * @throws ArtifactLoadException If artifact cannot be correctly downloaded in container (probably not found)
     */
    public void downloadAsMainRemoteArtifact(String remoteArtifactUrl) throws ArtifactLoadException {
-      downloadArtifact(new RemoteArtifact(remoteArtifactUrl, null), true);
+      downloadArtifact(getHttpEndpoint(), new RemoteArtifact(remoteArtifactUrl, null), true);
    }
 
    /**
@@ -664,7 +664,27 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     * @throws ArtifactLoadException If artifact cannot be correctly downloaded in container (probably not found)
     */
    public void downloadAsSecondaryRemoteArtifact(String remoteArtifactUrl) throws ArtifactLoadException {
-      downloadArtifact(new RemoteArtifact(remoteArtifactUrl, null), false);
+      downloadArtifact(getHttpEndpoint(), new RemoteArtifact(remoteArtifactUrl, null), false);
+   }
+
+   /**
+    * Download a remote artifact as a primary or main one within the Microcks container.
+    * @param microcksContainerHttpEndpoint The Http endpoint where to reach running MicrocksContainer
+    * @param remoteArtifactUrl The URL to remote artifact (OpenAPI, Postman collection, Protobuf, GraphQL schema, ...)
+    * @throws ArtifactLoadException If artifact cannot be correctly downloaded in container (probably not found)
+    */
+   public static void downloadAsMainRemoteArtifact(String microcksContainerHttpEndpoint, String remoteArtifactUrl) throws ArtifactLoadException {
+      downloadArtifact(microcksContainerHttpEndpoint, new RemoteArtifact(remoteArtifactUrl, null), true);
+   }
+
+   /**
+    * Download a remote artifact as a secondary one within the Microcks container.
+    * @param microcksContainerHttpEndpoint The Http endpoint where to reach running MicrocksContainer
+    * @param remoteArtifactUrl The URL to remote artifact (OpenAPI, Postman collection, Protobuf, GraphQL schema, ...)
+    * @throws ArtifactLoadException If artifact cannot be correctly downloaded in container (probably not found)
+    */
+   public static void downloadAsSecondaryRemoteArtifact(String microcksContainerHttpEndpoint, String remoteArtifactUrl) throws ArtifactLoadException {
+      downloadArtifact(microcksContainerHttpEndpoint, new RemoteArtifact(remoteArtifactUrl, null), false);
    }
 
    /**
@@ -833,10 +853,10 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       }
    }
 
-   private void downloadArtifact(RemoteArtifact remoteArtifact, boolean mainArtifact) throws ArtifactLoadException {
+   private static void downloadArtifact(String microcksContainerHttpEndpoint, RemoteArtifact remoteArtifact, boolean mainArtifact) throws ArtifactLoadException {
       try {
          // Use the artifact/download endpoint to download the artifact.
-         URL url = new URL(getHttpEndpoint() + "/api/artifact/download");
+         URL url = new URL(microcksContainerHttpEndpoint + "/api/import");
          HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
          httpConn.setUseCaches(false);
          httpConn.setRequestMethod("POST");
