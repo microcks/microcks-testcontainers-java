@@ -862,7 +862,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          httpConn.setRequestMethod("POST");
          httpConn.setDoOutput(true);
 
-         String requestBody = "mainArtifact=" + mainArtifact + "&url=" + remoteArtifact.getUrl();
+         String requestBody = "mainArtifact=" + mainArtifact + "&url=" + URLEncoder.encode(remoteArtifact.getUrl(), StandardCharsets.UTF_8.name());
 
          if (remoteArtifact.getSecretName() != null) {
             requestBody += "&secretName=" + remoteArtifact.getSecretName();
