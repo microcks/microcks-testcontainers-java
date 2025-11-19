@@ -856,7 +856,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    private static void downloadArtifact(String microcksContainerHttpEndpoint, RemoteArtifact remoteArtifact, boolean mainArtifact) throws ArtifactLoadException {
       try {
          // Use the artifact/download endpoint to download the artifact.
-         URL url = new URL(microcksContainerHttpEndpoint + "/api/import");
+         URL url = new URL(microcksContainerHttpEndpoint + "/api/artifact/download");
          HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
          httpConn.setUseCaches(false);
          httpConn.setRequestMethod("POST");
@@ -970,7 +970,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       httpConn.setUseCaches(false);
       httpConn.setDoOutput(true);
       httpConn.setDoInput(true);
-      httpConn.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
+      httpConn.setRequestProperty(HTTP_CONTENT_TYPE, "multipart/form-data; boundary=" + boundary);
 
       try (OutputStream os = httpConn.getOutputStream();
            PrintWriter writer = new PrintWriter(new OutputStreamWriter(os, StandardCharsets.UTF_8), true);
@@ -980,7 +980,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
                .append(HTTP_UPLOAD_LINE_FEED)
                .append("Content-Disposition: form-data; name=\"file\"; filename=\"" + file.getName() + "\"")
                .append(HTTP_UPLOAD_LINE_FEED)
-               .append("Content-Type: " + contentType)
+               .append(HTTP_CONTENT_TYPE + ": " + contentType)
                .append(HTTP_UPLOAD_LINE_FEED)
                .append("Content-Transfer-Encoding: binary")
                .append(HTTP_UPLOAD_LINE_FEED)
