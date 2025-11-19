@@ -24,7 +24,6 @@ import io.github.microcks.testcontainers.model.TestRequest;
 import io.github.microcks.testcontainers.model.TestResult;
 import io.github.microcks.testcontainers.model.TestRunnerType;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import dasniko.testcontainers.keycloak.KeycloakContainer;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
@@ -33,7 +32,6 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 import org.testcontainers.utility.DockerImageName;
 
 import java.io.File;
@@ -54,7 +52,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class MicrocksContainerTest {
 
-   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.12.0";
+   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.13.0";
    private static final DockerImageName MICROCKS_IMAGE = DockerImageName.parse(IMAGE);
 
    private static final DockerImageName BAD_PASTRY_IMAGE = DockerImageName.parse("quay.io/microcks/contract-testing-demo:01");

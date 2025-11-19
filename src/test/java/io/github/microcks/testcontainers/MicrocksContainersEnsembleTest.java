@@ -94,7 +94,7 @@ import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
  */
 class MicrocksContainersEnsembleTest {
 
-   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.12.0";
+   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.13.0";
    private static final String ASYNC_IMAGE = "quay.io/microcks/microcks-uber-async-minion:nightly-native";
    private static final String NATIVE_IMAGE = "quay.io/microcks/microcks-uber:nightly-native";
 
