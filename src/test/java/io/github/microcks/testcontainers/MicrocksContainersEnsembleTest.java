@@ -156,6 +156,7 @@ class MicrocksContainersEnsembleTest {
    void testAsyncFeatureMockingFunctionality() throws Exception {
       try (
             MicrocksContainersEnsemble ensemble = new MicrocksContainersEnsemble(IMAGE)
+                  .withDebugLogLevel()
                   .withMainArtifacts("pastry-orders-asyncapi.yml")
                   .withAsyncFeature();
       ) {
@@ -163,6 +164,10 @@ class MicrocksContainersEnsembleTest {
          testMicrocksConfigRetrieval(ensemble.getMicrocksContainer().getHttpEndpoint());
 
          testMicrocksAsyncMockingFunctionality(ensemble);
+
+         // Check that debug logs are present.
+         assertTrue(ensemble.getMicrocksContainer().getLogs().contains("DEBUG 1"));
+         assertTrue(ensemble.getAsyncMinionContainer().getLogs().contains("DEBUG ["));
       }
    }
 

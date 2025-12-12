@@ -337,3 +337,17 @@ assertTrue(testResult.isSuccess());
 ```
 
 In addition, you can use the `getEventMessagesForTestCase()` method to retrieve the events received during the test.
+
+### Troubleshooting
+
+You can enable debug logs on the Microcks container by setting the debug log level and then retrieving the logs:
+
+```java
+MicrocksContainer microcks = new MicrocksContainer("[...]"))
+        .withDebugLogLevel()
+        .start();
+microcks.getLogs();
+```
+
+The same `.withDebugLogLevel()` method is available on also `MicrocksContainersEnsemble` for enabling debug logs 
+on all contained Microcks containers.

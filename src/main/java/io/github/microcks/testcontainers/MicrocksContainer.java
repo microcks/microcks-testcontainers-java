@@ -112,6 +112,15 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    }
 
    /**
+    * Set the container logging level to DEBUG.
+    * @return self
+    */
+   public MicrocksContainer withDebugLogLevel() {
+      withEnv("LOGGING_LEVEL_IO_GITHUB_MICROCKS", "DEBUG");
+      return self();
+   }
+
+   /**
     * Provide paths to artifacts that will be imported as primary or main ones within the Microcks container
     * once it will be started and healthy.
     * @param artifacts A set of paths to artifacts that will be loaded as classpath resources

@@ -62,6 +62,7 @@ class MicrocksContainerTest {
    void testMockingFunctionality() throws Exception {
       try (
             MicrocksContainer microcks = new MicrocksContainer(IMAGE)
+                  .withDebugLogLevel()
                   .withSnapshots("microcks-repository.json")
                   .withMainArtifacts("apipastries-openapi.yaml", "sub dir/weather-forecast-openapi.yaml")
                   .withMainRemoteArtifacts("https://raw.githubusercontent.com/microcks/microcks/master/samples/APIPastry-openapi.yaml")
@@ -73,6 +74,9 @@ class MicrocksContainerTest {
 
          testMockEndpoints(microcks);
          testMicrocksMockingFunctionality(microcks);
+
+         // Check that debug logs are present.
+         assertTrue(microcks.getLogs().contains("DEBUG 1"));
       }
    }
 

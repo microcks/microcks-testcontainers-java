@@ -94,6 +94,16 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
 
 
    /**
+    * Set the container logging level to DEBUG.
+    * @return self
+    */
+   public MicrocksAsyncMinionContainer withDebugLogLevel() {
+      withEnv("QUARKUS_LOG_CONSOLE_LEVEL", "DEBUG");
+      withEnv("QUARKUS_LOG_CATEGORY__IO_GITHUB_MICROCKS__LEVEL", "DEBUG");
+      return self();
+   }
+
+   /**
     * Connect the MicrocksAsyncMinionContainer to a Kafka server to allow Kafka messages mocking.
     * @param connection Connection details to a Kafka broker.
     * @return self

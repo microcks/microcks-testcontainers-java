@@ -53,9 +53,9 @@ public class MicrocksContainersEnsemble implements Startable {
    private MicrocksAsyncMinionContainer asyncMinion;
    private final MicrocksContainer microcks;
 
-   private final Map<String, String> postmanEnvVars = new HashMap();
-   private final Map<String, String> asyncMinionEnvVars = new HashMap();
-   private final Map<String, String> microcksEnvVars = new HashMap();
+   private final Map<String, String> postmanEnvVars = new HashMap<>();
+   private final Map<String, String> asyncMinionEnvVars = new HashMap<>();
+   private final Map<String, String> microcksEnvVars = new HashMap<>();
 
    /**
     * Build a new MicrocksContainersEnsemble with its base container image name as string. This image must
@@ -98,6 +98,17 @@ public class MicrocksContainersEnsemble implements Startable {
                   + ":" + MicrocksContainer.MICROCKS_HTTP_PORT)
             .withEnv("ASYNC_MINION_URL", "http://" + MICROCKS_ASYNC_MINION_CONTAINER_ALIAS
                   + ":" + MicrocksAsyncMinionContainer.MICROCKS_ASYNC_MINION_HTTP_PORT);
+   }
+
+   /**
+    * Enable debug log level on MicrocksContainersEnsemble containers.
+    * @return self
+    */
+   public MicrocksContainersEnsemble withDebugLogLevel() {
+      microcks.withDebugLogLevel();
+      asyncMinionEnvVars.put("QUARKUS_LOG_CONSOLE_LEVEL", "DEBUG");
+      asyncMinionEnvVars.put("QUARKUS_LOG_CATEGORY__IO_GITHUB_MICROCKS__LEVEL", "DEBUG");
+      return this;
    }
 
    /**
