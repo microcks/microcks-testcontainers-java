@@ -17,6 +17,7 @@ package io.github.microcks.testcontainers;
 
 import io.github.microcks.testcontainers.connection.AmazonServiceConnection;
 import io.github.microcks.testcontainers.connection.GenericConnection;
+import io.github.microcks.testcontainers.connection.GooglePubSubConnection;
 import io.github.microcks.testcontainers.connection.KafkaConnection;
 import io.github.microcks.testcontainers.model.Secret;
 import io.github.microcks.testcontainers.model.TestRequest;
@@ -25,6 +26,29 @@ import io.github.microcks.testcontainers.model.TestRunnerType;
 import io.github.microcks.testcontainers.model.TestStepResult;
 import io.github.microcks.testcontainers.model.UnidirectionalEvent;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.api.core.ApiFuture;
+import com.google.api.core.ApiFutureCallback;
+import com.google.api.core.ApiFutures;
+import com.google.api.gax.core.NoCredentialsProvider;
+import com.google.api.gax.grpc.GrpcTransportChannel;
+import com.google.api.gax.rpc.FixedTransportChannelProvider;
+import com.google.api.gax.rpc.TransportChannelProvider;
+import com.google.cloud.pubsub.v1.MessageReceiver;
+import com.google.cloud.pubsub.v1.Publisher;
+import com.google.cloud.pubsub.v1.Subscriber;
+import com.google.cloud.pubsub.v1.SubscriptionAdminClient;
+import com.google.cloud.pubsub.v1.SubscriptionAdminSettings;
+import com.google.cloud.pubsub.v1.TopicAdminClient;
+import com.google.cloud.pubsub.v1.TopicAdminSettings;
+import com.google.common.util.concurrent.MoreExecutors;
+import com.google.protobuf.ByteString;
+import com.google.pubsub.v1.ProjectSubscriptionName;
+import com.google.pubsub.v1.PubsubMessage;
+import com.google.pubsub.v1.PushConfig;
+import com.google.pubsub.v1.SubscriptionName;
+import com.google.pubsub.v1.TopicName;
 import com.hivemq.client.mqtt.mqtt3.Mqtt3BlockingClient;
 import com.hivemq.client.mqtt.mqtt3.Mqtt3Client;
 import com.rabbitmq.client.AMQP;
@@ -33,6 +57,8 @@ import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
 import com.rabbitmq.client.DefaultConsumer;
 import com.rabbitmq.client.Envelope;
+import io.grpc.ManagedChannel;
+import io.grpc.ManagedChannelBuilder;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -54,6 +80,7 @@ import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.Network;
+import org.testcontainers.containers.PubSubEmulatorContainer;
 import org.testcontainers.containers.RabbitMQContainer;
 import org.testcontainers.containers.localstack.LocalStackContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
@@ -94,7 +121,7 @@ import static org.testcontainers.shaded.org.awaitility.Awaitility.await;
  */
 class MicrocksContainersEnsembleTest {
 
-   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.13.0";
+   private static final String IMAGE = "quay.io/microcks/microcks-uber:1.13.1";
    private static final String ASYNC_IMAGE = "quay.io/microcks/microcks-uber-async-minion:nightly-native";
    private static final String NATIVE_IMAGE = "quay.io/microcks/microcks-uber:nightly-native";
 
@@ -248,7 +275,7 @@ class MicrocksContainersEnsembleTest {
                .withServices(LocalStackContainer.Service.SQS);
          localstack.start();
 
-         ensemble =  new MicrocksContainersEnsemble(network, IMAGE)
+         ensemble = new MicrocksContainersEnsemble(network, IMAGE)
                .withMainArtifacts("pastry-orders-asyncapi.yml")
                .withAsyncFeature()
                .withAmazonSQSConnection(new AmazonServiceConnection(localstack.getRegion(),
@@ -261,6 +288,32 @@ class MicrocksContainersEnsembleTest {
          testMicrocksAsyncAmazonSQSMockingFunctionality(ensemble, localstack);
       } finally {
          localstack.stop();
+         ensemble.stop();
+      }
+   }
+
+   @Test
+   void testAsyncFeatureGooglePubSubMockingFunctionality() {
+      Network network = null;
+      PubSubEmulatorContainer emulator = null;
+      MicrocksContainersEnsemble ensemble = null;
+      try {
+         network = Network.newNetwork();
+         emulator = new PubSubEmulatorContainer(DockerImageName.parse("gcr.io/google.com/cloudsdktool/google-cloud-cli:549.0.0-emulators"))
+               .withNetwork(network)
+               .withNetworkAliases("pubsub-emulator");
+         emulator.start();
+
+         ensemble = new MicrocksContainersEnsemble(network, "quay.io/microcks/microcks-uber:nightly")
+               .withMainArtifacts("pastry-orders-asyncapi.yml")
+               .withAsyncFeature()
+               .withGooglePubSubConnection(new GooglePubSubConnection("my-custom-project", "pubsub-emulator:8085"));
+         ensemble.start();
+         testMicrocksConfigRetrieval(ensemble.getMicrocksContainer().getHttpEndpoint());
+
+         testMicrocksAsyncGooglePubSubMockingFunctionality(ensemble, emulator);
+      } finally {
+         emulator.stop();
          ensemble.stop();
       }
    }
@@ -339,6 +392,31 @@ class MicrocksContainersEnsembleTest {
          testMicrocksAsyncAmazonSQSContractTestingFunctionality(ensemble, localstack);
       } finally {
          localstack.stop();
+         ensemble.stop();
+      }
+   }
+
+   @Test
+   void testAsyncFeatureGooglePubSubTestingFunctionnality() throws Exception {
+      Network network = null;
+      PubSubEmulatorContainer emulator = null;
+      MicrocksContainersEnsemble ensemble = null;
+      try {
+         network = Network.newNetwork();
+         emulator = new PubSubEmulatorContainer(DockerImageName.parse("gcr.io/google.com/cloudsdktool/google-cloud-cli:549.0.0-emulators"))
+               .withNetwork(network)
+               .withNetworkAliases("pubsub-emulator");
+         emulator.start();
+
+         ensemble = new MicrocksContainersEnsemble(network, "quay.io/microcks/microcks-uber:nightly")
+               .withMainArtifacts("pastry-orders-asyncapi.yml")
+               .withAsyncFeature();
+         ensemble.start();
+         testMicrocksConfigRetrieval(ensemble.getMicrocksContainer().getHttpEndpoint());
+
+         testMicrocksAsyncGooglePubSubContractTestingFunctionality(ensemble, emulator);
+      } finally {
+         emulator.stop();
          ensemble.stop();
       }
    }
@@ -647,6 +725,75 @@ class MicrocksContainersEnsembleTest {
       }
    }
 
+   private void testMicrocksAsyncGooglePubSubMockingFunctionality(MicrocksContainersEnsemble ensemble, PubSubEmulatorContainer emulator) {
+      String projectId = "my-custom-project";
+      String subscriptionId = "my-subscription-id";
+
+      // PastryordersAPI-010-pastry-orders
+      String pubSubTopic = ensemble.getAsyncMinionContainer().getGooglePubSubMockTopic("Pastry orders API", "0.1.0", "SUBSCRIBE pastry/orders");
+      String expectedMessage = "{\"id\":\"4dab240d-7847-4e25-8ef3-1530687650c8\",\"customerId\":\"fe1088b3-9f30-4dc1-a93d-7b74f0a072b9\",\"status\":\"VALIDATED\",\"productQuantities\":[{\"quantity\":2,\"pastryName\":\"Croissant\"},{\"quantity\":1,\"pastryName\":\"Millefeuille\"}]}";
+
+      // Prepare to receive messages.
+      List<String> messages = new ArrayList<>();
+
+      String hostport = emulator.getEmulatorEndpoint();
+      ManagedChannel channel = ManagedChannelBuilder.forTarget(hostport).usePlaintext().build();
+      try {
+         TransportChannelProvider channelProvider = FixedTransportChannelProvider.create(
+               GrpcTransportChannel.create(channel)
+         );
+         NoCredentialsProvider credentialsProvider = NoCredentialsProvider.create();
+
+         // Wait a moment to be sure that minion has created the PubSub topic.
+         Thread.sleep(2500L);
+
+         // Ensure connection is possible and subscription exists.
+         SubscriptionAdminSettings subscriptionAdminSettings = SubscriptionAdminSettings.newBuilder()
+               .setTransportChannelProvider(channelProvider)
+               .setCredentialsProvider(credentialsProvider)
+               .build();
+         SubscriptionAdminClient subscriptionAdminClient = SubscriptionAdminClient.create(subscriptionAdminSettings);
+         SubscriptionName subscriptionName = SubscriptionName.of(projectId, subscriptionId);
+         subscriptionAdminClient.createSubscription(
+               subscriptionName,
+               TopicName.of(projectId, pubSubTopic),
+               PushConfig.getDefaultInstance(),
+               10
+         );
+
+         // Subscribe to PubSub.
+         MessageReceiver receiver = (message, consumer) -> {
+            messages.add(message.getData().toString(StandardCharsets.UTF_8));
+            consumer.ack();
+         };
+
+         Subscriber.Builder subBuilder = Subscriber
+               .newBuilder(ProjectSubscriptionName.of(subscriptionName.getProject(), subscriptionName.getSubscription()),
+                     receiver)
+               .setChannelProvider(channelProvider)
+               .setCredentialsProvider(credentialsProvider);
+
+         // Create a new subscriber for subscription.
+         Subscriber subscriber = subBuilder.build();
+         subscriber.startAsync().awaitRunning();
+
+         // Wait and stop async receiver.
+         Thread.sleep(4000L);
+         subscriber.stopAsync();
+
+      } catch (Exception e) {
+         fail("Exception while connecting to Emulator PubSub topic", e);
+      } finally {
+         channel.shutdown();
+      }
+
+      // Check consumed messages.
+      assertFalse(messages.isEmpty());
+      for (String message : messages) {
+         assertEquals(expectedMessage, message);
+      }
+   }
+
    private void testMicrocksAsyncContractTestingFunctionality(MicrocksContainersEnsemble ensemble) throws Exception {
       // Produce a new test request.
       TestRequest testRequest = new TestRequest();
@@ -843,7 +990,7 @@ class MicrocksContainersEnsembleTest {
       testRequest.setRunnerType(TestRunnerType.ASYNC_API_SCHEMA.name());
       testRequest.setTestEndpoint("sqs://" + localstack.getRegion() + "/pastry-orders?overrideUrl=http://localstack:" + localstack.getExposedPorts().get(0));
       testRequest.setSecretName("localstack secret");
-      testRequest.setTimeout(5000l);
+      testRequest.setTimeout(5000L);
 
       String queueUrl = null;
       SqsClient sqsClient = null;
@@ -944,6 +1091,126 @@ class MicrocksContainersEnsembleTest {
 
       assertTrue(testResult.isSuccess());
       assertEquals("sqs://" + localstack.getRegion() + "/pastry-orders?overrideUrl=http://localstack:" + localstack.getExposedPorts().get(0), testResult.getTestedEndpoint());
+
+      // Ensure we had at least grab one message.
+      assertFalse(testResult.getTestCaseResults().get(0).getTestStepResults().isEmpty());
+      assertNull(testResult.getTestCaseResults().get(0).getTestStepResults().get(0).getMessage());
+   }
+
+   private void testMicrocksAsyncGooglePubSubContractTestingFunctionality(MicrocksContainersEnsemble ensemble, PubSubEmulatorContainer emulator) throws Exception {
+      String projectId = "my-custom-project";
+      String topicId = "pastry-orders";
+
+      // Bad message has no status, good message has one.
+      String badMessage = "{\"id\":\"abcd\",\"customerId\":\"efgh\",\"productQuantities\":[{\"quantity\":2,\"pastryName\":\"Croissant\"},{\"quantity\":1,\"pastryName\":\"Millefeuille\"}]}";
+      String goodMessage = "{\"id\":\"abcd\",\"customerId\":\"efgh\",\"status\":\"CREATED\",\"productQuantities\":[{\"quantity\":2,\"pastryName\":\"Croissant\"},{\"quantity\":1,\"pastryName\":\"Millefeuille\"}]}";
+
+      // Produce a new test request.
+      TestRequest testRequest = new TestRequest();
+      testRequest.setServiceId("Pastry orders API:0.1.0");
+      testRequest.setRunnerType(TestRunnerType.ASYNC_API_SCHEMA.name());
+      testRequest.setTestEndpoint("googlepubsub://my-custom-project/pastry-orders?emulatorHost=pubsub-emulator:8085");
+      testRequest.setSecretName("localstack secret");
+      testRequest.setTimeout(5000L);
+
+      Publisher publisher = null;
+      CompletableFuture<TestResult> testResultFuture = null;
+      String hostport = emulator.getEmulatorEndpoint();
+      ManagedChannel channel = ManagedChannelBuilder.forTarget(hostport).usePlaintext().build();
+      try {
+         TransportChannelProvider channelProvider = FixedTransportChannelProvider.create(
+               GrpcTransportChannel.create(channel)
+         );
+         NoCredentialsProvider credentialsProvider = NoCredentialsProvider.create();
+
+         // Create the topic.
+         TopicAdminSettings topicAdminSettings = TopicAdminSettings.newBuilder()
+               .setTransportChannelProvider(channelProvider)
+               .setCredentialsProvider(credentialsProvider)
+               .build();
+         try (TopicAdminClient topicAdminClient = TopicAdminClient.create(topicAdminSettings)) {
+            TopicName topicName = TopicName.of(projectId, topicId);
+            topicAdminClient.createTopic(topicName);
+         }
+
+         // Create the publisher.
+         publisher = Publisher.newBuilder(TopicName.of(projectId, topicId))
+               .setChannelProvider(channelProvider)
+               .setCredentialsProvider(credentialsProvider)
+               .build();
+
+         // First test should fail with validation failure messages.
+         testResultFuture = ensemble.getMicrocksContainer().testEndpointAsync(testRequest);
+
+         for (int i=0; i<5; i++) {
+            PubsubMessage message = PubsubMessage.newBuilder()
+                  .setData(ByteString.copyFromUtf8(badMessage))
+                  .build();
+            publisher.publish(message);
+            System.err.println("Sending bad message " + i + " on Google PubSub topic");
+            await().pollDelay(1000, TimeUnit.MILLISECONDS)
+                  .untilAsserted(() -> assertTrue(true));
+         }
+      } catch (Exception e) {
+         channel.shutdown();
+         fail("Exception while connecting to Emulator PubSub topic", e);
+      }
+
+      TestResult testResult = null;
+      try {
+         testResult = testResultFuture.get();
+      } catch (Exception e) {
+         channel.shutdown();
+         fail("Got an exception while waiting for test completion", e);
+      }
+
+      assertFalse(testResult.isSuccess());
+      assertEquals("googlepubsub://my-custom-project/pastry-orders?emulatorHost=pubsub-emulator:8085", testResult.getTestedEndpoint());
+
+      // Ensure we had at least grab one message.
+      assertFalse(testResult.getTestCaseResults().get(0).getTestStepResults().isEmpty());
+      TestStepResult testStepResult = testResult.getTestCaseResults().get(0).getTestStepResults().get(0);
+      assertTrue(testStepResult.getMessage().contains("required property 'status' not found"));
+
+
+      // Switch endpoint to the correct implementation.
+      // Other way of doing things via builder and fluent api.
+      TestRequest otherTestRequestDTO = new TestRequest.Builder()
+            .serviceId("Pastry orders API:0.1.0")
+            .runnerType(TestRunnerType.ASYNC_API_SCHEMA.name())
+            .testEndpoint("googlepubsub://my-custom-project/pastry-orders?emulatorHost=pubsub-emulator:8085")
+            .secretName("localstack secret")
+            .timeout(5000L)
+            .build();
+
+      try {
+         // Second test should succeed without validation failure messages.
+         testResultFuture = ensemble.getMicrocksContainer().testEndpointAsync(otherTestRequestDTO);
+
+         for (int i=0; i<5; i++) {
+            PubsubMessage message = PubsubMessage.newBuilder()
+                  .setData(ByteString.copyFromUtf8(goodMessage))
+                  .build();
+            publisher.publish(message);
+            System.err.println("Sending good message " + i + " on Google PubSub topic");
+            await().pollDelay(1000, TimeUnit.MILLISECONDS)
+                  .untilAsserted(() -> assertTrue(true));
+         }
+      } catch (Exception e) {
+         fail("Exception while connecting to Emulator PubSub topic", e);
+      } finally {
+         channel.shutdown();
+      }
+
+      try {
+         testResult = testResultFuture.get();
+      } catch (Exception e) {
+         channel.shutdown();
+         fail("Got an exception while waiting for test completion", e);
+      }
+
+      assertTrue(testResult.isSuccess());
+      assertEquals("googlepubsub://my-custom-project/pastry-orders?emulatorHost=pubsub-emulator:8085", testResult.getTestedEndpoint());
 
       // Ensure we had at least grab one message.
       assertFalse(testResult.getTestCaseResults().get(0).getTestStepResults().isEmpty());

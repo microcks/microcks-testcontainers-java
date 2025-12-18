@@ -17,6 +17,7 @@ package io.github.microcks.testcontainers;
 
 import io.github.microcks.testcontainers.connection.AmazonServiceConnection;
 import io.github.microcks.testcontainers.connection.GenericConnection;
+import io.github.microcks.testcontainers.connection.GooglePubSubConnection;
 import io.github.microcks.testcontainers.connection.KafkaConnection;
 
 import org.testcontainers.containers.GenericContainer;
@@ -188,6 +189,23 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
    }
 
    /**
+    * Connect the MicrocksAsyncMinionContainer to a Google Pub/Sub service to allow Pub/Sub messages mocking.
+    * @param connection Connection details to a Google Pub/Sub service.
+    * @return self
+    */
+   public MicrocksAsyncMinionContainer withGooglePubSubConnection(GooglePubSubConnection connection) {
+      if (!extraProtocols.contains(",GOOGLEPUBSUB")) {
+         extraProtocols += ",GOOGLEPUBSUB";
+      }
+      withEnv(ASYNC_PROTOCOLS_ENV_VAR, extraProtocols);
+      withEnv("GOOGLEPUBSUB_PROJECT", connection.getProjectId());
+      if (connection.getEmulatorHost() != null) {
+         withEnv("PUBSUB_EMULATOR_HOST", connection.getEmulatorHost());
+      }
+      return this;
+   }
+
+   /**
     * Get the Http endpoint where Microcks can be accessed (you'd have to append '/api' to access APIs)
     * @return The Http endpoint for talking to container.
     */
@@ -287,6 +305,24 @@ public class MicrocksAsyncMinionContainer extends GenericContainer<MicrocksAsync
     */
    public String getAmazonSNSMockTopic(String service, String version, String operationName) {
       return getAmazonServiceMockDestination(service, version, operationName);
+   }
+
+   /**
+    * Get the exposed mock topic for a Google Pub/Sub Service.
+    * @param service The name of Service/API
+    * @param version The version of Service/API
+    * @param operationName The name of operation to get the topic for
+    * @return A usable topic to interact with Microcks mocks.
+    */
+   public String getGooglePubSubMockTopic(String service, String version, String operationName) {
+      // operationName may start with SUBSCRIBE or PUBLISH.
+      if (operationName.contains(" ")) {
+         operationName = operationName.split(" ")[1];
+      }
+      return String.format(DESTINATION_PATTERN,
+            service.replace(" ", "").replace("-", ""),
+            version.replace(" ", ""),
+            operationName.replace("/", "-"));
    }
 
    private String getAmazonServiceMockDestination(String service, String version, String operationName) {

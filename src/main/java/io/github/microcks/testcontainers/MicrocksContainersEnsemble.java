@@ -17,6 +17,7 @@ package io.github.microcks.testcontainers;
 
 import io.github.microcks.testcontainers.connection.AmazonServiceConnection;
 import io.github.microcks.testcontainers.connection.GenericConnection;
+import io.github.microcks.testcontainers.connection.GooglePubSubConnection;
 import io.github.microcks.testcontainers.connection.KafkaConnection;
 import io.github.microcks.testcontainers.model.Secret;
 
@@ -263,6 +264,17 @@ public class MicrocksContainersEnsemble implements Startable {
    public MicrocksContainersEnsemble withAmazonSNSConnection(AmazonServiceConnection connection) {
       ensureAsyncFeatureIsEnabled();
       this.asyncMinion.withAmazonSNSConnection(connection);
+      return this;
+   }
+
+   /**
+    * Once the Async Feature is enabled, connects to a Google Pub/Sub service.
+    * @param connection Connection details to a Google Pub/Sub service.
+    * @return self
+    */
+   public MicrocksContainersEnsemble withGooglePubSubConnection(GooglePubSubConnection connection) {
+      ensureAsyncFeatureIsEnabled();
+      this.asyncMinion.withGooglePubSubConnection(connection);
       return this;
    }
 

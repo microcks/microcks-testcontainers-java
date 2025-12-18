@@ -29,6 +29,8 @@ channels:
           type: topic
           durable: true
           autoDelete: false
+      googlepubsub:
+        topic: projects/my-project/topics/my-topic
 components:
   messages:
     PastryOrder:
