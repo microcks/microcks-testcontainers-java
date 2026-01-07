@@ -78,7 +78,7 @@ or if you're using Gradle:
 
 ```groovy
 dependencies {
-    testImplementation 'io.github.microcks:microcks-testcontainers:0.4.2'
+    testImplementation 'io.github.microcks:microcks-testcontainers:0.4.3'
 }
 ```
 
