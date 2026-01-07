@@ -70,7 +70,7 @@ If you're using Maven:
 <dependency>
   <groupId>io.github.microcks</groupId>
   <artifactId>microcks-testcontainers</artifactId>
-  <version>0.4.2</version>
+  <version>0.4.3</version>
 </dependency>
 ```
 
