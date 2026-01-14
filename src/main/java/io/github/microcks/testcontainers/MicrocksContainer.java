@@ -725,6 +725,16 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    }
 
    /**
+    * Download a remote artifact as a secondary one within the Microcks container.
+    * @param remoteArtifact The remote artifact representation (URL + secret)
+    * @param mainArtifact Whether this artifact should be considered as main or secondary.
+    * @throws ArtifactLoadException If artifact cannot be correctly downloaded in container (probably not found)
+    */
+   public void downloadRemoteArtifact(RemoteArtifact remoteArtifact, boolean mainArtifact) throws ArtifactLoadException {
+      downloadArtifact( getHttpEndpoint(), remoteArtifact, mainArtifact);
+   }
+
+   /**
     * Download a remote artifact as a primary or main one within the Microcks container.
     * @param microcksContainerHttpEndpoint The Http endpoint where to reach running MicrocksContainer
     * @param remoteArtifactUrl The URL to remote artifact (OpenAPI, Postman collection, Protobuf, GraphQL schema, ...)
@@ -910,7 +920,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       }
    }
 
-   private static void downloadArtifact(String microcksContainerHttpEndpoint, RemoteArtifact remoteArtifact, boolean mainArtifact) throws ArtifactLoadException {
+   public static void downloadArtifact(String microcksContainerHttpEndpoint, RemoteArtifact remoteArtifact, boolean mainArtifact) throws ArtifactLoadException {
       try {
          // Use the artifact/download endpoint to download the artifact.
          URL url = new URL(microcksContainerHttpEndpoint + "/api/artifact/download");
