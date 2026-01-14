@@ -376,6 +376,54 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    }
 
    /**
+    * Create a Secret mithin the MicrocksContainer.
+    * @param secret The description of a secret to access remote Git repository, test endpoint or broker.
+    * @throws SecretCreationException If secret cannot be correctly created in container.
+    */
+   public void createSecret( Secret secret) throws SecretCreationException {
+      createSecret(getHttpEndpoint(), secret);
+   }
+
+   /**
+    * Create a Secret mithin the MicrocksContainer.
+    * @param microcksContainerHttpEndpoint The Http endpoint where to reach running MicrocksContainer
+    * @param secret The description of a secret to access remote Git repository, test endpoint or broker.
+    * @throws SecretCreationException If secret cannot be correctly created in container.
+    */
+   public static void createSecret(String microcksContainerHttpEndpoint, Secret secret) throws SecretCreationException {
+      try {
+         URL url = new URL(microcksContainerHttpEndpoint + "/api/secrets");
+         HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
+         httpConn.setRequestMethod("POST");
+         httpConn.setRequestProperty(HTTP_CONTENT_TYPE, APPLICATION_JSON);
+         httpConn.setRequestProperty(HTTP_ACCEPT, APPLICATION_JSON);
+         httpConn.setDoOutput(true);
+
+         String requestBody = getMapper().writeValueAsString(secret);
+
+         try (OutputStream os = httpConn.getOutputStream()) {
+            byte[] input = requestBody.getBytes(StandardCharsets.UTF_8);
+            os.write(input, 0, input.length);
+            os.flush();
+         }
+
+         if (httpConn.getResponseCode() != 201) {
+            // Read response content for diagnostic purpose and disconnect.
+            StringBuilder responseContent = getResponseContent(httpConn);
+            httpConn.disconnect();
+
+            log.error("Secret has not been correctly created: {}", responseContent);
+            throw new MicrocksException("Secret has not been correctly created: " + responseContent);
+         }
+         // Disconnect Http connection.
+         httpConn.disconnect();
+      } catch (Exception e) {
+         log.warn("Error while creating Secret: {}", secret.getName());
+         throw new SecretCreationException("Error while creating Secret", e);
+      }
+   }
+
+   /**
     * Import an artifact as a primary or main one within the Microcks container.
     * @param artifact The file representing artifact (OpenAPI, Postman collection, Protobuf, GraphQL schema, ...)
     * @throws IOException If file cannot be read of transmission exception occurs.
@@ -914,39 +962,6 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       } catch (Exception e) {
          log.error("Could not load classpath snapshot: {}", snapshotPath);
          throw new ArtifactLoadException("Error while importing snapshot: " + snapshotPath, e);
-      }
-   }
-
-   private void createSecret(Secret secret) {
-      try {
-         URL url = new URL(getHttpEndpoint() + "/api/secrets");
-         HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
-         httpConn.setRequestMethod("POST");
-         httpConn.setRequestProperty(HTTP_CONTENT_TYPE, APPLICATION_JSON);
-         httpConn.setRequestProperty(HTTP_ACCEPT, APPLICATION_JSON);
-         httpConn.setDoOutput(true);
-
-         String requestBody = getMapper().writeValueAsString(secret);
-
-         try (OutputStream os = httpConn.getOutputStream()) {
-            byte[] input = requestBody.getBytes(StandardCharsets.UTF_8);
-            os.write(input, 0, input.length);
-            os.flush();
-         }
-
-         if (httpConn.getResponseCode() != 201) {
-            // Read response content for diagnostic purpose and disconnect.
-            StringBuilder responseContent = getResponseContent(httpConn);
-            httpConn.disconnect();
-
-            log.error("Secret has not been correctly created: {}", responseContent);
-            throw new MicrocksException("Secret has not been correctly created: " + responseContent);
-         }
-         // Disconnect Http connection.
-         httpConn.disconnect();
-      } catch (Exception e) {
-         log.warn("Error while creating Secret: {}", secret.getName());
-         throw new SecretCreationException("Error while creating Secret", e);
       }
    }
 
