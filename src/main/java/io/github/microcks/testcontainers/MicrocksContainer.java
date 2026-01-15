@@ -43,10 +43,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.math.BigDecimal;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.net.URLDecoder;
-import java.net.URLEncoder;
+import java.net.*;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
@@ -75,6 +72,8 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    private static final String HTTP_CONTENT_TYPE = "Content-Type";
    private static final String HTTP_ACCEPT = "Accept";
    private static final String APPLICATION_JSON = "application/json";
+
+   private static final String API_TESTS = "/api/tests/";
 
    public static final int MICROCKS_HTTP_PORT = 8080;
    public static final int MICROCKS_GRPC_PORT = 9090;
@@ -392,7 +391,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     */
    public static void createSecret(String microcksContainerHttpEndpoint, Secret secret) throws SecretCreationException {
       try {
-         URL url = new URL(microcksContainerHttpEndpoint + "/api/secrets");
+         URL url = URI.create(microcksContainerHttpEndpoint + "/api/secrets").toURL();
          HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
          httpConn.setRequestMethod("POST");
          httpConn.setRequestProperty(HTTP_CONTENT_TYPE, APPLICATION_JSON);
@@ -468,7 +467,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          throw new IOException("Artifact " + artifact.getPath() + " does not exist or can't be read.");
       }
 
-      URL url = new URL(microcksContainerHttpEndpoint + "/api/artifact/upload" + (mainArtifact ? "" : "?mainArtifact=false"));
+      URL url = URI.create(microcksContainerHttpEndpoint + "/api/artifact/upload" + (mainArtifact ? "" : "?mainArtifact=false")).toURL();
       HttpURLConnection httpConn = uploadFileToMicrocks(url, artifact, "application/octet-stream");
 
       if (httpConn.getResponseCode() != 201) {
@@ -497,7 +496,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          throw new IOException("Snapshot " + snapshot.getPath() + " does not exist or can't be read.");
       }
 
-      URL url = new URL(microcksContainerHttpEndpoint + "/api/import");
+      URL url = URI.create(microcksContainerHttpEndpoint + "/api/import").toURL();
       HttpURLConnection httpConn = uploadFileToMicrocks(url, snapshot, APPLICATION_JSON);
 
       if (httpConn.getResponseCode() != 201) {
@@ -561,7 +560,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       String requestBody = getMapper().writeValueAsString(testRequest);
 
       // Build a new client on correct API endpoint.
-      URL url = new URL(microcksContainerHttpEndpoint + "/api/tests");
+      URL url = URI.create(microcksContainerHttpEndpoint + "/api/tests").toURL();
       HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
       httpConn.setRequestMethod("POST");
       httpConn.setRequestProperty(HTTP_CONTENT_TYPE, APPLICATION_JSON);
@@ -633,7 +632,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       String operation = operationName.replace('/', '!');
       String testCaseId = testResult.getId() + "-" + testResult.getTestNumber() + "-" + URLEncoder.encode(operation);
 
-      URL url = new URL(microcksContainerHttpEndpoint + "/api/tests/" + testResult.getId() + "/messages/" + testCaseId);
+      URL url = URI.create(microcksContainerHttpEndpoint + API_TESTS + testResult.getId() + "/messages/" + testCaseId).toURL();
       HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
       httpConn.setRequestMethod("GET");
       httpConn.setRequestProperty(HTTP_ACCEPT, APPLICATION_JSON);
@@ -684,7 +683,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       String operation = operationName.replace('/', '!');
       String testCaseId = testResult.getId() + "-" + testResult.getTestNumber() + "-" + URLEncoder.encode(operation);
 
-      URL url = new URL(microcksContainerHttpEndpoint + "/api/tests/" + testResult.getId() + "/events/" + testCaseId);
+      URL url = URI.create(microcksContainerHttpEndpoint + API_TESTS + testResult.getId() + "/events/" + testCaseId).toURL();
       HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
       httpConn.setRequestMethod("GET");
       httpConn.setRequestProperty(HTTP_ACCEPT, APPLICATION_JSON);
@@ -923,7 +922,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    public static void downloadArtifact(String microcksContainerHttpEndpoint, RemoteArtifact remoteArtifact, boolean mainArtifact) throws ArtifactLoadException {
       try {
          // Use the artifact/download endpoint to download the artifact.
-         URL url = new URL(microcksContainerHttpEndpoint + "/api/artifact/download");
+         URL url = URI.create(microcksContainerHttpEndpoint + "/api/artifact/download").toURL();
          HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
          httpConn.setUseCaches(false);
          httpConn.setRequestMethod("POST");
@@ -1038,7 +1037,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    }
 
    private static TestResult refreshTestResult(String microcksContainerHttpEndpoint, String testResultId) throws IOException {
-      StringBuilder content = getFromRestApi(microcksContainerHttpEndpoint + "/api/tests/" + testResultId);
+      StringBuilder content = getFromRestApi(microcksContainerHttpEndpoint + API_TESTS + testResultId);
 
       return getMapper().readValue(content.toString(), TestResult.class);
    }
@@ -1049,7 +1048,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
     */
    private static StringBuilder getFromRestApi(String restApiURL) throws IOException {
       // Build a new client on correct API endpoint.
-      URL url = new URL(restApiURL);
+      URL url = URI.create(restApiURL).toURL();
       HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
       httpConn.setRequestMethod("GET");
       httpConn.setRequestProperty(HTTP_ACCEPT, APPLICATION_JSON);
