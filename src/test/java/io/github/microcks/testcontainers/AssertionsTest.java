@@ -1,3 +1,18 @@
+/*
+ * Copyright The Microcks Authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *  http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.github.microcks.testcontainers;
 
 import io.github.microcks.testcontainers.model.TestCaseResult;
@@ -16,7 +31,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Test class for Assertions.
  * @author laurent
  */
-public class AssertionsTest {
+class AssertionsTest {
 
    @Test
    void testFullSuccess() {
@@ -62,7 +77,7 @@ public class AssertionsTest {
 
          List<Throwable> failures = mfe.getFailures();
          assertEquals(1, failures.size());
-         assertTrue(failures.get(0).getMessage().equals("Message 'req21' of operation 'op2' failed ==> Not matching"));
+         assertEquals("Message 'req21' of operation 'op2' failed ==> Not matching", failures.get(0).getMessage());
       }
       if (!failed) {
          fail("An AssertionFailedError should have been thrown");
