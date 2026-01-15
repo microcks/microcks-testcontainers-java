@@ -28,9 +28,9 @@ Java library for Testcontainers that enables embedding Microcks into your JUnit 
 
 ## Build Status
 
-Latest released version is `0.4.3`.
+Latest released version is `0.4.4`.
 
-Current development version is `0.4.4-SNAPSHOT`.
+Current development version is `0.4.5-SNAPSHOT`.
 
 #### Sonarcloud Quality metrics
 
@@ -70,7 +70,7 @@ If you're using Maven:
 <dependency>
   <groupId>io.github.microcks</groupId>
   <artifactId>microcks-testcontainers</artifactId>
-  <version>0.4.3</version>
+  <version>0.4.4</version>
 </dependency>
 ```
 
@@ -78,7 +78,7 @@ or if you're using Gradle:
 
 ```groovy
 dependencies {
-    testImplementation 'io.github.microcks:microcks-testcontainers:0.4.3'
+    testImplementation 'io.github.microcks:microcks-testcontainers:0.4.4'
 }
 ```
 
@@ -100,7 +100,7 @@ Artifacts can be imported as main/Primary ones or as secondary ones. See [Multi-
 You can do it before starting the container using simple paths:
 
 ```java
-MicrocksContainer microcks = new MicrocksContainer(DockerImageName.parse("quay.io/microcks/microcks-uber:1.13.0"))
+MicrocksContainer microcks = new MicrocksContainer(DockerImageName.parse("quay.io/microcks/microcks-uber:1.13.2"))
     .withMainArtifacts("apipastries-openapi.yaml")
     .withSecondaryArtifacts("apipastries-postman-collection.json");
 microcks.start();
@@ -118,7 +118,7 @@ Please refer to our [MicrocksContainerTest](https://github.com/microcks/microcks
 You can also import full [repository snapshots](https://microcks.io/documentation/administrating/snapshots/) at once:
 
 ```java
-MicrocksContainer microcks = new MicrocksContainer(DockerImageName.parse("quay.io/microcks/microcks-uber:1.12.0"))
+MicrocksContainer microcks = new MicrocksContainer(DockerImageName.parse("quay.io/microcks/microcks-uber:1.13.2"))
       .withSnapshots("microcks-repository.json");
 microcks.start();
 ```
