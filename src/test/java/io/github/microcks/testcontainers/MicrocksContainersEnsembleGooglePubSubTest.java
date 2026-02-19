@@ -203,7 +203,6 @@ class MicrocksContainersEnsembleGooglePubSubTest {
       testRequest.setServiceId("Pastry orders API:0.1.0");
       testRequest.setRunnerType(TestRunnerType.ASYNC_API_SCHEMA.name());
       testRequest.setTestEndpoint("googlepubsub://my-custom-project/pastry-orders?emulatorHost=pubsub-emulator:8085");
-      testRequest.setSecretName("localstack secret");
       testRequest.setTimeout(5000L);
 
       Publisher publisher = null;
@@ -272,7 +271,6 @@ class MicrocksContainersEnsembleGooglePubSubTest {
             .serviceId("Pastry orders API:0.1.0")
             .runnerType(TestRunnerType.ASYNC_API_SCHEMA.name())
             .testEndpoint("googlepubsub://my-custom-project/pastry-orders?emulatorHost=pubsub-emulator:8085")
-            .secretName("localstack secret")
             .timeout(5000L)
             .build();
 
