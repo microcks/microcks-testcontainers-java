@@ -38,12 +38,17 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.math.BigDecimal;
-import java.net.*;
+import java.net.HttpURLConnection;
+import java.net.URI;
+import java.net.URL;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
@@ -986,7 +991,13 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
 
    private static StringBuilder getResponseContent(HttpURLConnection httpConn) throws IOException {
       StringBuilder responseContent = new StringBuilder();
-      try (BufferedReader br = new BufferedReader(new InputStreamReader(httpConn.getInputStream(), StandardCharsets.UTF_8))) {
+      InputStream is;
+      if (httpConn.getResponseCode() == 400) {
+         is = httpConn.getErrorStream();
+      } else {
+         is = httpConn.getInputStream();
+      }
+      try (BufferedReader br = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
          String responseLine;
          while ((responseLine = br.readLine()) != null) {
             responseContent.append(responseLine.trim());
