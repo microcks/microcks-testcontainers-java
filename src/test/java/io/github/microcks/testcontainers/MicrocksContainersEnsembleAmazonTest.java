@@ -66,7 +66,7 @@ class MicrocksContainersEnsembleAmazonTest {
       MicrocksContainersEnsemble ensemble = null;
       try {
          network = Network.newNetwork();
-         localstack = new LocalStackContainer(DockerImageName.parse("localstack/localstack:latest"))
+         localstack = new LocalStackContainer(DockerImageName.parse("localstack/localstack:4.14"))
                .withNetwork(network)
                .withNetworkAliases("localstack")
                .withServices(LocalStackContainer.Service.SQS);
@@ -102,7 +102,7 @@ class MicrocksContainersEnsembleAmazonTest {
       MicrocksContainersEnsemble ensemble = null;
       try {
          network = Network.newNetwork();
-         localstack = new LocalStackContainer(DockerImageName.parse("localstack/localstack:latest"))
+         localstack = new LocalStackContainer(DockerImageName.parse("localstack/localstack:4.14"))
                .withNetwork(network)
                .withNetworkAliases("localstack")
                .withServices(LocalStackContainer.Service.SQS);
