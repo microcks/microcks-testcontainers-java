@@ -36,8 +36,8 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.containers.KafkaContainer;
 import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.kafka.ConfluentKafkaContainer;
 import org.testcontainers.utility.DockerImageName;
 
 import java.time.Duration;
@@ -73,10 +73,10 @@ class MicrocksContainersEnsembleKafkaTest {
                   .withAsyncFeature(DockerImageName.parse(asyncMinionImage))
                   .withKafkaConnection(new KafkaConnection("kafka:19092"));
 
-            KafkaContainer kafka = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.0"))
+            ConfluentKafkaContainer kafka = new ConfluentKafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.0"))
                   .withNetwork(ensemble.getNetwork())
                   .withNetworkAliases("kafka")
-                  .withListener(() -> "kafka:19092");
+                  .withListener("kafka:19092");
       ) {
          kafka.start();
          ensemble.start();
@@ -98,10 +98,10 @@ class MicrocksContainersEnsembleKafkaTest {
                   .withMainArtifacts("pastry-orders-asyncapi.yml")
                   .withAsyncFeature(asyncMinionImage);
 
-            KafkaContainer kafka = new KafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.0"))
+            ConfluentKafkaContainer kafka = new ConfluentKafkaContainer(DockerImageName.parse("confluentinc/cp-kafka:7.5.0"))
                   .withNetwork(ensemble.getNetwork())
                   .withNetworkAliases("kafka")
-                  .withListener(() -> "kafka:19092");
+                  .withListener("kafka:19092");
       ) {
          kafka.start();
          ensemble.start();
@@ -111,7 +111,7 @@ class MicrocksContainersEnsembleKafkaTest {
       }
    }
 
-   private void testMicrocksAsyncKafkaMocking(MicrocksContainersEnsemble ensemble, KafkaContainer kafka) {
+   private void testMicrocksAsyncKafkaMocking(MicrocksContainersEnsemble ensemble, ConfluentKafkaContainer kafka) {
       // PastryordersAPI-0.1.0-pastry-orders
       String kafkaTopic = ensemble.getAsyncMinionContainer().getKafkaMockTopic("Pastry orders API", "0.1.0", "SUBSCRIBE pastry/orders");
       String expectedMessage = "{\"id\":\"4dab240d-7847-4e25-8ef3-1530687650c8\",\"customerId\":\"fe1088b3-9f30-4dc1-a93d-7b74f0a072b9\",\"status\":\"VALIDATED\",\"productQuantities\":[{\"quantity\":2,\"pastryName\":\"Croissant\"},{\"quantity\":1,\"pastryName\":\"Millefeuille\"}]}";
@@ -158,7 +158,7 @@ class MicrocksContainersEnsembleKafkaTest {
       assertEquals(expectedMessage, message);
    }
 
-   private void testMicrocksAsyncKafkaContractTesting(MicrocksContainersEnsemble ensemble, KafkaContainer kafka) throws Exception {
+   private void testMicrocksAsyncKafkaContractTesting(MicrocksContainersEnsemble ensemble, ConfluentKafkaContainer kafka) throws Exception {
       // Bad message has no status, good message has one.
       String badMessage = "{\"id\":\"abcd\",\"customerId\":\"efgh\",\"productQuantities\":[{\"quantity\":2,\"pastryName\":\"Croissant\"},{\"quantity\":1,\"pastryName\":\"Millefeuille\"}]}";
       String goodMessage = "{\"id\":\"abcd\",\"customerId\":\"efgh\",\"status\":\"CREATED\",\"productQuantities\":[{\"quantity\":2,\"pastryName\":\"Croissant\"},{\"quantity\":1,\"pastryName\":\"Millefeuille\"}]}";

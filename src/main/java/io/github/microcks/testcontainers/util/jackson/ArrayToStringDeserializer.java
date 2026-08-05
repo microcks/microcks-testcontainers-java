@@ -36,7 +36,8 @@ public class ArrayToStringDeserializer extends JsonDeserializer<String> {
          jsonParser.nextToken();
          while (jsonParser.hasCurrentToken() && jsonParser.currentToken() != JsonToken.END_ARRAY) {
             if (jsonParser.currentToken() == JsonToken.START_OBJECT) {
-               throw deserializationContext.mappingException("Expected array of primitive types, got an object");
+               // This actually throws an exception.
+               deserializationContext.reportInputMismatch(this, "Expected array of primitive types, got an object");
             }
             values.add(jsonParser.getValueAsString());
             jsonParser.nextToken();
