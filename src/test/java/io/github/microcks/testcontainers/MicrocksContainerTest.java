@@ -24,24 +24,31 @@ import io.github.microcks.testcontainers.model.TestRequest;
 import io.github.microcks.testcontainers.model.TestResult;
 import io.github.microcks.testcontainers.model.TestRunnerType;
 
+import com.sun.net.httpserver.HttpServer;
 import dasniko.testcontainers.keycloak.KeycloakContainer;
 import io.restassured.RestAssured;
+import io.restassured.path.json.JsonPath;
 import io.restassured.response.Response;
 import org.apache.commons.lang3.time.DateUtils;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.Testcontainers;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.utility.DockerImageName;
 
 import java.io.File;
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Executors;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -180,6 +187,59 @@ class MicrocksContainerTest {
          assertEquals("my-secret", secrets.jsonPath().get("[0].name"));
          assertEquals("abc-123-xyz", secrets.jsonPath().get("[0].token"));
          assertEquals("x-microcks", secrets.jsonPath().get("[0].tokenHeader"));
+      }
+   }
+
+   @Test
+   void testWebhookFunctionality() throws Exception {
+      // Collect the bodies of the requests received on the webhook endpoint.
+      List<String> receivedMessages = Collections.synchronizedList(new ArrayList<>());
+
+      // Start a minimalist HTTP server relying on the JDK's built-in com.sun.net.httpserver.HttpServer. Binding on
+      // port 0 lets the OS pick a random free port so tests can run in parallel without port collisions.
+      HttpServer webhookCallbackServer = HttpServer.create(new InetSocketAddress(0), 0);
+      int webhookCallbackPort = webhookCallbackServer.getAddress().getPort();
+      webhookCallbackServer.createContext("/", exchange -> {
+         try {
+            byte[] body = exchange.getRequestBody().readAllBytes();
+            receivedMessages.add(new String(body, StandardCharsets.UTF_8));
+            // Reply with a 200 and no body to acknowledge reception.
+            exchange.sendResponseHeaders(200, -1);
+         } finally {
+            exchange.close();
+         }
+      });
+      webhookCallbackServer.setExecutor(Executors.newSingleThreadExecutor());
+      webhookCallbackServer.start();
+
+      try (
+            MicrocksContainer microcks = new MicrocksContainer(IMAGE)
+                  .withMainArtifacts("petstore-webhooks-openapi.yaml")
+                  .withWebhookRegistration(WebhookCoordinates.of("Petstore Webhooks:2.0.0", "newPet WEBHOOK",
+                        "http://host.testcontainers.internal:" + webhookCallbackPort));
+      ) {
+         Testcontainers.exposeHostPorts(webhookCallbackPort);
+         microcks.start();
+
+         // Wait for the webhook server to receive at least one message (Microcks pushes them periodically each 3sec).
+         Thread.sleep(7000L);
+
+         // Check that we actually received at least one message through the webhook.
+         assertFalse(receivedMessages.isEmpty(), "Webhook server should have received at least one message");
+         assertEquals(2, receivedMessages.size(), "Webhook server should have received exactly two messages");
+
+         // Check the content of every received message matches the 'Rusty' example of the API definition.
+         for (String message : receivedMessages) {
+            JsonPath json = new JsonPath(message);
+            assertEquals("Rusty", json.getString("name"));
+            assertTrue(json.getInt("id") >= 1 && json.getInt("id") <= 10,
+                  "id should be a random int between 1 and 10 but was " + json.getInt("id"));
+            assertTrue(Arrays.asList("cat", "dog").contains(json.getString("tag")),
+                  "tag should be either 'cat' or 'dog' but was " + json.getString("tag"));
+         }
+      } finally {
+         // Always stop the embedded HTTP server.
+         webhookCallbackServer.stop(0);
       }
    }
 

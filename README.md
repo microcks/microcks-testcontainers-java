@@ -20,6 +20,7 @@ Java library for Testcontainers that enables embedding Microcks into your JUnit 
 - [Verifying mock endpoint has been invoked](#verifying-mock-endpoint-has-been-invoked)
 - [Launching new contract-tests](#launching-new-contract-tests)
 - [Using authentication Secrets](#using-authentication-secrets)
+- [Webhook callback testing](#webhook-callback-testing)
 - [Advanced features with MicrocksContainersEnsemble](#advanced-features-with-microckscontainersensemble)
   - [Postman contract-testing](#postman-contract-testing)
   - [Asynchronous API support](#asynchronous-api-support)
@@ -30,7 +31,7 @@ Java library for Testcontainers that enables embedding Microcks into your JUnit 
 
 Latest released version is `0.4.4`.
 
-Current development version is `0.4.5-SNAPSHOT`.
+Current development version is `0.5.0-SNAPSHOT`.
 
 #### Sonarcloud Quality metrics
 
@@ -230,6 +231,31 @@ TestRequest testRequest = new TestRequest.Builder()
       .timeout(5000L)
       .build();
 ```
+
+### Webhook callback testing
+
+> Starts with version `0.5.0` and requires Microcks `1.14.0` or later.
+
+As the application you're developing can be a consumer of external webhooks, it's super useful to be able to
+verify your application behaves correctly when receiving these webhook callbacks.
+
+To register a webhook callback, you can use the `withWebhookRegistration()` method on the `MicrocksContainer`:
+
+```java
+MicrocksContainer microcks = new MicrocksContainer(IMAGE)
+        .withMainArtifacts("petstore-webhooks-openapi.yaml")
+        .withWebhookRegistration(WebhookCoordinates.of("Petstore Webhooks:2.0.0", "newPet WEBHOOK",
+                "http://host.testcontainers.internal:" + webhookCallbackPort));
+
+// Host port exposition should be done here
+Testcontainers.exposeHostPorts(webhookCallbackPort);
+
+microcks.start();
+```
+
+The `webhookCallbackPort` is the port on which your application is listening for incoming webhook callbacks.
+It should be exposed to the host so that the Microcks container can reach it.
+
 
 ### Advanced features with MicrocksContainersEnsemble
 

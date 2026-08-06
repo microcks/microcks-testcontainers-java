@@ -18,9 +18,11 @@ package io.github.microcks.testcontainers;
 import io.github.microcks.testcontainers.model.DailyInvocationStatistic;
 import io.github.microcks.testcontainers.model.RequestResponsePair;
 import io.github.microcks.testcontainers.model.Secret;
+import io.github.microcks.testcontainers.model.ServiceRef;
 import io.github.microcks.testcontainers.model.TestResult;
 import io.github.microcks.testcontainers.model.TestRequest;
 import io.github.microcks.testcontainers.model.UnidirectionalEvent;
+import io.github.microcks.testcontainers.model.WebhookRegistrationRequest;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.github.dockerjava.api.command.InspectContainerResponse;
@@ -28,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.shaded.com.fasterxml.jackson.core.type.TypeReference;
 import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 import org.testcontainers.shaded.org.awaitility.Awaitility;
 import org.testcontainers.shaded.org.awaitility.core.ConditionTimeoutException;
@@ -52,6 +55,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -91,6 +95,7 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
    private Set<RemoteArtifact> mainRemoteArtifactsToImport;
    private Set<RemoteArtifact> secondaryRemoteArtifactsToImport;
    private Set<Secret> secrets;
+   private Set<WebhookCoordinates> webhooksToRegister;
 
    /**
     * Build a new MicrocksContainer with its container image name as string. This image must
@@ -237,6 +242,19 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       return self();
    }
 
+   /**
+    * Provide Webhook coordinates that should be registered in Microcks after startup.
+    * @param webhookCoordinates A set of webhook coordinates to register.
+    * @return self
+    */
+   public MicrocksContainer withWebhookRegistration(WebhookCoordinates... webhookCoordinates) {
+      if (webhooksToRegister == null) {
+         webhooksToRegister = new HashSet<>();
+      }
+      webhooksToRegister.addAll(Arrays.stream(webhookCoordinates).collect(Collectors.toSet()));
+      return self();
+   }
+
    @Override
    protected void containerIsStarted(InspectContainerResponse containerInfo) {
       // Load snapshots before anything else.
@@ -260,6 +278,10 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       }
       if (secondaryArtifactsToImport != null && !secondaryArtifactsToImport.isEmpty()) {
          secondaryArtifactsToImport.forEach((String artifactPath) -> this.importArtifact(artifactPath, false));
+      }
+      if (webhooksToRegister != null && !webhooksToRegister.isEmpty()) {
+         List<ServiceRef> services = this.getServices();
+         webhooksToRegister.forEach((WebhookCoordinates webhookCoordinates) -> this.registerWebhook(webhookCoordinates, services));
       }
    }
 
@@ -514,6 +536,91 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
       }
       // Disconnect Http connection.
       httpConn.disconnect();
+   }
+
+   /**
+    * Retrieve the list of uploaded/imported services into the Microcks container instance.
+    * @return A list of ServiceRef containing information about services.
+    */
+   public List<ServiceRef> getServices() {
+      return getServices(getHttpEndpoint());
+   }
+
+   /**
+    * Retrieve the list of uploaded/imported services into the Microcks container instance.
+    * @param microcksContainerHttpEndpoint The Http endpoint where to reach running MicrocksContainer
+    * @return A list of ServiceRef containing information about services.
+    */
+   public static List<ServiceRef> getServices(String microcksContainerHttpEndpoint) {
+      String restApiURL = String.format("%s/api/services?size=100", microcksContainerHttpEndpoint);
+      try {
+         StringBuilder content = getFromRestApi(restApiURL);
+
+         return content.length() == 0 ? null : getMapper().readValue(content.toString(), new TypeReference<List<ServiceRef>>() {});
+      } catch (IOException e) {
+         log.error("Failed to get services list at {}", restApiURL, e);
+      }
+      return Collections.emptyList();
+   }
+
+   /**
+    * Register a webhook for a specific service and operation.
+    * @param coordinates The coordinates of the webhook.
+    * @param services The list of available services.
+    * @throws WebhookRegistrationException if an error occurs during webhook registration.
+    */
+   public void registerWebhook(WebhookCoordinates coordinates, List<ServiceRef> services) throws WebhookRegistrationException {
+      registerWebhook(getHttpEndpoint(), coordinates, services);
+   }
+
+   /**
+    * Register a webhook for a specific service and operation.
+    * @param microcksContainerHttpEndpoint The Http endpoint where to reach running MicrocksContainer
+    * @param coordinates The coordinates of the webhook.
+    * @param services The list of available services.
+    * @throws WebhookRegistrationException if an error occurs during webhook registration.
+    */
+   public static void registerWebhook(String microcksContainerHttpEndpoint, WebhookCoordinates coordinates, List<ServiceRef> services) throws WebhookRegistrationException {
+      try {
+         // Find the correct technical serviceId from the functional one made of <service_name>:<service_version>.
+         String[] parts = coordinates.getServiceId().split(":");
+
+         String serviceId = services.stream().filter(ref -> ref.getName().equals(parts[0]) && ref.getVersion().equals(parts[1]))
+               .findFirst()
+               .orElseThrow(() -> new IllegalArgumentException("Service " + parts[0] + ":" + parts[1] + " not found in Microcks container"))
+               .getId();
+
+         String registrationServicesId = serviceId + "-" + coordinates.getOperationName();
+
+         WebhookRegistrationRequest registrationRequest = new WebhookRegistrationRequest(registrationServicesId, coordinates.getTargetUrl());
+         String requestBody = getMapper().writeValueAsString(registrationRequest);
+
+         // Build a new client on correct API endpoint.
+         URL url = URI.create(microcksContainerHttpEndpoint + "/api/webhooks").toURL();
+         HttpURLConnection httpConn = (HttpURLConnection) url.openConnection();
+         httpConn.setRequestMethod("POST");
+         httpConn.setRequestProperty(HTTP_CONTENT_TYPE, APPLICATION_JSON);
+         httpConn.setDoOutput(true);
+
+         try (OutputStream os = httpConn.getOutputStream()) {
+            byte[] input = requestBody.getBytes(StandardCharsets.UTF_8);
+            os.write(input, 0, input.length);
+         }
+
+         if (httpConn.getResponseCode() != 201) {
+            // Read response content for diagnostic purpose and disconnect.
+            StringBuilder responseContent = getResponseContent(httpConn);
+            httpConn.disconnect();
+
+            log.error("Couldn't create a Webhook registration on Microcks: {} ", responseContent);
+         }
+         // Disconnect Http connection.
+         httpConn.disconnect();
+         log.debug("Created a new Webhook registration, now waiting on {}", coordinates.getTargetUrl());
+      }  catch (Exception e) {
+         log.warn("Error while registering Webhook: {}", coordinates.getTargetUrl());
+         throw new WebhookRegistrationException("Error while registering Webhook", e);
+      }
    }
 
    /**
@@ -1089,6 +1196,16 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
          super(message);
       }
       public SecretCreationException(String message, Throwable cause) {
+         super(message, cause);
+      }
+   }
+
+   public static class WebhookRegistrationException extends RuntimeException {
+
+      public WebhookRegistrationException(String message) {
+         super(message);
+      }
+      public WebhookRegistrationException(String message, Throwable cause) {
          super(message, cause);
       }
    }
