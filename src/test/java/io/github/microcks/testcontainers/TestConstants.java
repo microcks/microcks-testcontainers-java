@@ -19,7 +19,7 @@ import org.testcontainers.utility.DockerImageName;
 
 public class TestConstants {
 
-   private static final String LATEST = "1.13.1";
+   private static final String LATEST = "1.15.0";
    private static final String LATEST_NATIVE = LATEST + "-native";
 
    public static final String LATEST_IMAGE = "quay.io/microcks/microcks-uber:" + LATEST;
