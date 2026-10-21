@@ -590,7 +590,8 @@ public class MicrocksContainer extends GenericContainer<MicrocksContainer> {
                .orElseThrow(() -> new IllegalArgumentException("Service " + parts[0] + ":" + parts[1] + " not found in Microcks container"))
                .getId();
 
-         String registrationServicesId = serviceId + "-" + coordinates.getOperationName();
+         // Slashes in operation names are encoded as '!' to be safe in URL paths; first '-' separates service from operation.
+         String registrationServicesId = serviceId + "-" + coordinates.getOperationName().replace('/', '!');
 
          WebhookRegistrationRequest registrationRequest = new WebhookRegistrationRequest(registrationServicesId, coordinates.getTargetUrl());
          String requestBody = getMapper().writeValueAsString(registrationRequest);
