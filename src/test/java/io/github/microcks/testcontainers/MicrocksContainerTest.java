@@ -223,13 +223,15 @@ class MicrocksContainerTest {
 
          // Wait for the webhook server to receive at least one message (Microcks pushes them periodically each 3sec).
          Thread.sleep(7000L);
+         // Work on a snapshot as the webhook server keeps adding messages from another thread.
+         List<String> messages = new ArrayList<>(receivedMessages);
 
          // Check that we actually received at least one message through the webhook.
-         assertFalse(receivedMessages.isEmpty(), "Webhook server should have received at least one message");
-         assertEquals(2, receivedMessages.size(), "Webhook server should have received exactly two messages");
+         assertFalse(messages.isEmpty(), "Webhook server should have received at least one message");
+         assertEquals(2, messages.size(), "Webhook server should have received exactly two messages");
 
          // Check the content of every received message matches the 'Rusty' example of the API definition.
-         for (String message : receivedMessages) {
+         for (String message : messages) {
             JsonPath json = new JsonPath(message);
             assertEquals("Rusty", json.getString("name"));
             assertTrue(json.getInt("id") >= 1 && json.getInt("id") <= 10,

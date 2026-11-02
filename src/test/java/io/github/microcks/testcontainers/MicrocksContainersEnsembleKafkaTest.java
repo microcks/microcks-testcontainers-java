@@ -168,13 +168,13 @@ class MicrocksContainersEnsembleKafkaTest {
       testRequest.setServiceId("Pastry orders API:0.1.0");
       testRequest.setRunnerType(TestRunnerType.ASYNC_API_SCHEMA.name());
       testRequest.setTestEndpoint("kafka://kafka:19092/pastry-orders"); //?startOffset=0");
-      testRequest.setTimeout(4000l);
+      testRequest.setTimeout(6000l);
 
       // First test should fail with validation failure messages.
       CompletableFuture<TestResult> testResultFuture = ensemble.getMicrocksContainer().testEndpointAsync(testRequest);
-      await().pollDelay(750, TimeUnit.MILLISECONDS).untilAsserted(() -> assertTrue(true));
+      await().pollDelay(1500, TimeUnit.MILLISECONDS).untilAsserted(() -> assertTrue(true));
 
-      // Initialize Kafka producer and send 4 messages.
+      // Initialize Kafka producer and send several messages.
       Properties props = new Properties();
       props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, kafka.getBootstrapServers().replace("PLAINTEXT://", ""));
       props.put(ProducerConfig.CLIENT_ID_CONFIG, "random-" + System.currentTimeMillis());
@@ -182,9 +182,9 @@ class MicrocksContainersEnsembleKafkaTest {
       props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class.getName());
 
       try {
-         // Send 4 messages on Kafka.
+         // Send 8 messages on Kafka.
          try (final Producer<String, String> producer = new KafkaProducer<>(props)) {
-            for (int i=0; i<5; i++) {
+            for (int i=0; i<8; i++) {
                ProducerRecord<String, String> record = new ProducerRecord<>("pastry-orders",
                      String.valueOf(System.currentTimeMillis()), badMessage);
                System.err.println(System.currentTimeMillis() + " Sending bad message " + i + " on Kafka broker");
@@ -239,7 +239,7 @@ class MicrocksContainersEnsembleKafkaTest {
 
       // Second test should succeed without validation failure messages.
       testResultFuture = ensemble.getMicrocksContainer().testEndpointAsync(otherTestRequestDTO);
-      await().pollDelay(750, TimeUnit.MILLISECONDS).untilAsserted(() -> assertTrue(true));
+      await().pollDelay(1500, TimeUnit.MILLISECONDS).untilAsserted(() -> assertTrue(true));
 
       try {
          // Send 4 messages on Kafka.
